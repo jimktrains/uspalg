@@ -210,11 +210,3 @@ struct JulianDay {
     return Time{d, h, m, s};
   };
 };
-
-int main() {
-  auto t1 = Time{0, 23, 20, 0};
-  auto t2 = Time{0, 1,10,0};
-  auto t3 = t1-t2;
-  std::cout << t3.days << " " << t3.hour << "ʰ" << t3.minutes << "ᵐ" << t3.seconds << "ˢ" << std::endl;
-  std::cout << t3.decimalDay();
-}

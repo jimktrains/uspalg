@@ -78,7 +78,27 @@ struct Polygon {
     return bb;
   }
 
-  //  https://wrfranklin.org/Research/Short_Notes/pnpoly.html
+  // > The Method
+  // > I run a semi-infinite ray horizontally (increasing x, fixed y) out from
+  // > the test point, and count how many edges it crosses. At each crossing, the
+  // > ray switches between inside and outside. This is called the Jordan curve
+  // > theorem.
+  // >
+  // > The case of the ray going thru a vertex is handled correctly
+  // > via a careful selection of inequalities. Don't mess with this code unless
+  // > you're familiar with the idea of Simulation of Simplicity. This pretends
+  // > to shift the ray infinitesimally down so that it either clearly
+  // > intersects, or clearly doesn't touch. Since this is merely a conceptual,
+  // > infinitesimal, shift, it never creates an intersection that didn't exist
+  // > before, and never destroys an intersection that clearly existed before.
+  // >
+  // > The ray is tested against each edge thus:
+  // >
+  // >     Is the point in the half-plane to the left of the extended edge? and
+  // >     Is the point's Y coordinate within the edge's Y-range?
+  // >
+  // > Handling endpoints here is tricky.
+  // https://wrfranklin.org/Research/Short_Notes/pnpoly.html
   bool contains(const Point& p) const {
     bool c = false;
     for (int i = 0, j = npoints-1; i < npoints; j = i++) {
@@ -94,17 +114,21 @@ struct Polygon {
   };
 };
 
-constexpr static int RTREE_MAX_CHILDREN_COUNT = 11;
-constexpr static int RTREE_MIN_CHILDREN_COUNT = 5;
+// 12 children allows for a 496-byte RTree object, 16 bytes short of a
+// 512-byte block.
+constexpr static int RTREE_MAX_CHILDREN_COUNT = 12;
+constexpr static int RTREE_MIN_CHILDREN_COUNT =  6;
 
 // Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
 // Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
 // https://doi.org/10.1145/971697.602266.
 struct RTree {
-  BoundingBox bbox;
   long tuple_id;
   size_t child_count;
   RTree* children[RTREE_MAX_CHILDREN_COUNT];
+  // If we store the boudning box inside the node, then we can load
+  // this block from the sd card and figure out which block to descend
+  // into without loading anything else.
   BoundingBox children_bbox[RTREE_MAX_CHILDREN_COUNT];
 };
 

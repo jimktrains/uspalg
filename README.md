@@ -1,4 +1,7 @@
-# uspalg
+# uspalg - micro spatial algorithms
+
+This is a collection of spatial, time, and astronomical calculations
+intented for use on a microconroller.
 
 Datafiles via
 
