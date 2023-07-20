@@ -54,12 +54,12 @@ struct Time {
 // > as a Gregorian Date refers to the Gregorian Calendar. The JD
 // > has nothing to do with the Julian Calendar.
 //
-// Meeus, Jean 'Astronomical Algorithms' First English Edition,
+// Meeus, Jean. Astronomical Algorithms. First English Edition,
 //    Willmann-Bell Inc, 1991, pp59
 struct JulianDay {
   double jd;
 
-  // Meeus, Jean 'Astronomical Algorithms' First English Edition,
+  // Meeus, Jean. Astronomical Algorithms. First English Edition,
   //    Willmann-Bell Inc, 1991, pp65
   int dayOfWeek() const {
     auto jd = (long)(this->jd + 1.5);
@@ -106,7 +106,7 @@ struct GregorianDate {
   // - JSK
   double day;
 
-  // Meeus, Jean 'Astronomical Algorithms' First English Edition,
+  // Meeus, Jean. Astronomical Algorithms. First English Edition,
   //    Willmann-Bell Inc, 1991, pp60-61
   //
   // I'm not sure how to get this to return a JulianDay. If I forward
@@ -148,7 +148,7 @@ struct GregorianDate {
     };
   };
 
-  // Meeus, Jean 'Astronomical Algorithms' First English Edition,
+  // Meeus, Jean. Astronomical Algorithms. First English Edition,
   //    Willmann-Bell Inc, 1991, pp62
   bool isLeapYear() const {
     if (year % 4 == 0) {
@@ -163,7 +163,7 @@ struct GregorianDate {
     return false;
   };
 
-  // Meeus, Jean 'Astronomical Algorithms' First English Edition,
+  // Meeus, Jean. Astronomical Algorithms. First English Edition,
   //    Willmann-Bell Inc, 1991, pp65
   int dayOfYear() const {
     auto k = 2;
@@ -174,7 +174,7 @@ struct GregorianDate {
     return n;
   };
 
-  // Meeus, Jean 'Astronomical Algorithms' First English Edition,
+  // Meeus, Jean. Astronomical Algorithms. First English Edition,
   //    Willmann-Bell Inc, 1991, pp63
   //
   // N.B.: "The following method is valid for positive as well as for
