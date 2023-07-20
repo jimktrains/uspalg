@@ -1,6 +1,11 @@
 # uspalg
 
-TZ Shapefile from https://github.com/evansiroky/timezone-boundary-builder
+Datafiles via
+
+    wget -x https://data.iana.org/time-zones/releases/tzdata2023c.tar.gz
+    wget -x https://data.iana.org/time-zones/releases/tzdb-2023c.tar.lz
+    wget -x get https://github.com/evansiroky/timezone-boundary-builder/releases/download/2023b/timezones-with-oceans.shapefile.zip
+
 Converted to a gmt file via
 
     ogr2ogr combined-shapefile-with-oceans.gmt combined-shapefile-with-oceans.shp
