@@ -49,6 +49,52 @@ struct Time {
   };
 };
 
+// > In many books we read 'Julian Date' instead of 'Julian Day'.
+// > For ys, a Julian date is a date in the Julian Calendar, just
+// > as a Gregorian Date refers to the Gregorian Calendar. The JD
+// > has nothing to do with the Julian Calendar.
+//
+// Meeus, Jean 'Astronomical Algorithms' First English Edition,
+//    Willmann-Bell Inc, 1991, pp59
+struct JulianDay {
+  double jd;
+
+  // Meeus, Jean 'Astronomical Algorithms' First English Edition,
+  //    Willmann-Bell Inc, 1991, pp65
+  int dayOfWeek() const {
+    auto jd = (long)(this->jd + 1.5);
+    return jd % 7;
+  };
+
+  std::string  namedDayOfWeekShort() const {
+    switch(dayOfWeek()) {
+      case 0: return "Sun";
+      case 1: return "Mon";
+      case 2: return "Tue";
+      case 3: return "Wed";
+      case 4: return "Thu";
+      case 5: return "Fri";
+      case 6: return "Sat";
+      default: return "Unk";
+    };
+  }
+
+  Time toTime() const {
+    auto j = jd;
+    long d = (long)j;
+    j -= d;
+    j *= 24;
+    int h = (int)j;
+    j -= h;
+    j *= 60;
+    int m = (int)j;
+    j -= m;
+    j *= 60;
+    int s = (int)j;
+    return Time{d, h, m, s};
+  };
+};
+
 
 struct GregorianDate {
   int year;
@@ -127,25 +173,14 @@ struct GregorianDate {
     auto n = (275 * month)/9 - (k * ((month + 9)/12)) + day - 30;
     return n;
   };
-};
-
-// > In many books we read 'Julian Date' instead of 'Julian Day'.
-// > For ys, a Julian date is a date in the Julian Calendar, just
-// > as a Gregorian Date refers to the Gregorian Calendar. The JD
-// > has nothing to do with the Julian Calendar.
-//
-// Meeus, Jean 'Astronomical Algorithms' First English Edition,
-//    Willmann-Bell Inc, 1991, pp59
-struct JulianDay {
-  double jd;
 
   // Meeus, Jean 'Astronomical Algorithms' First English Edition,
   //    Willmann-Bell Inc, 1991, pp63
   //
   // N.B.: "The following method is valid for positive as well as for
   // negative years, but not for negative Julian Day numbers."
-  GregorianDate toGregorianDate() const {
-    auto jd = this->jd;
+  GregorianDate static toGregorianDate(const JulianDay& j) {
+    auto jd = j.jd;
 
     jd += 0.5;
     long z = (long)jd;
@@ -174,39 +209,13 @@ struct JulianDay {
 
     return GregorianDate{year, month, day};
   };
-
-  // Meeus, Jean 'Astronomical Algorithms' First English Edition,
-  //    Willmann-Bell Inc, 1991, pp65
-  int dayOfWeek() const {
-    auto jd = (long)(this->jd + 1.5);
-    return jd % 7;
-  };
-
-  std::string namedDayOfWeekShort() const {
-    switch(dayOfWeek()) {
-      case 0: return "Sun";
-      case 1: return "Mon";
-      case 2: return "Tue";
-      case 3: return "Wed";
-      case 4: return "Thu";
-      case 5: return "Fri";
-      case 6: return "Sat";
-      default: return "Unk";
-    };
-  }
-
-  Time toTime() const {
-    auto j = jd;
-    long d = (long)j;
-    j -= d;
-    j *= 24;
-    int h = (int)j;
-    j -= h;
-    j *= 60;
-    int m = (int)j;
-    j -= m;
-    j *= 60;
-    int s = (int)j;
-    return Time{d, h, m, s};
-  };
 };
+
+
+int main() {
+  auto t1 = Time{0, 23, 20, 0};
+  auto t2 = Time{0, 1,10,0};
+  auto t3 = t1-t2;
+  std::cout << t3.days << " " << t3.hour << "ʰ" << t3.minutes << "ᵐ" << t3.seconds << "ˢ" << std::endl;
+  std::cout << t3.decimalDay();
+}
