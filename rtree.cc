@@ -97,6 +97,9 @@ struct Polygon {
 constexpr static int RTREE_MAX_CHILDREN_COUNT = 11;
 constexpr static int RTREE_MIN_CHILDREN_COUNT = 5;
 
+// Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
+// Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
+// https://doi.org/10.1145/971697.602266.
 struct RTree {
   BoundingBox bbox;
   long tuple_id;

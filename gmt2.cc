@@ -66,7 +66,7 @@ int main () {
             << "Objects:  " << names.size() << std::endl
             << "Polygons: " << polys.size() << std::endl;
 
-  auto me = Point(-80.0, 40.44);
+  auto pittsburgh = Point(-80.0, 40.44);
   auto chicago = Point(-87.65, 41.85);
   auto portland = Point(-122.66, 45.51);
 
@@ -80,23 +80,23 @@ int main () {
     ofbb.write(reinterpret_cast<char*>( &bb.lowerright.x ), sizeof(bb.lowerright.x));
     ofbb.write(reinterpret_cast<char*>( &bb.lowerright.y ), sizeof(bb.lowerright.y));
 
-    if (p && me) {
-      std::cout << "Found me in " << i << " " << names[poly_to_name[i]] << std::endl;
+    if (p && pittsburgh) {
+      std::cout << "Found pittsburgh in " << " " << names[poly_to_name[i]] << std::endl;
     }
-    if (bb && me) {
-      std::cout << "Found me in bb for " << names[poly_to_name[i]] << std::endl;
+    if (bb && pittsburgh) {
+      std::cout << "Found pittsburgh in bb for " << names[poly_to_name[i]] << std::endl;
     }
     if (p && chicago) {
-      std::cout << "Found them in " << names[poly_to_name[i]] << std::endl;
+      std::cout << "Found chicago in " << names[poly_to_name[i]] << std::endl;
     }
     if (bb && chicago) {
-      std::cout << "Found them in bb for " << names[poly_to_name[i]] << std::endl;
+      std::cout << "Found chicago in bb for " << names[poly_to_name[i]] << std::endl;
     }
     if (p && portland) {
-      std::cout << "Found other them in " << names[poly_to_name[i]] << std::endl;
+      std::cout << "Found portland in " << names[poly_to_name[i]] << std::endl;
     }
     if (bb && portland) {
-      std::cout << "Found other them in bb for " << names[poly_to_name[i]] << std::endl;
+      std::cout << "Found portland in bb for " << names[poly_to_name[i]] << std::endl;
     }
   }
 }
