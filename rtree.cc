@@ -28,6 +28,19 @@ struct Point {
   };
 };
 
+struct Range {
+  double start;
+  double end;
+
+  bool overlaps(const Range& other) {
+    return start <= other.end and end >= other.start;
+  };
+
+  bool operator&&(const Range& other) {
+    return overlaps(other);
+  };
+};
+
 struct BoundingBox {
   Point upperleft;
   Point lowerright;
@@ -39,24 +52,34 @@ struct BoundingBox {
     };
   };
 
+  Range xrange() const {
+    return Range{upperleft.x, lowerright.x};
+  };
+
+  Range yrange() const {
+    return Range{lowerright.y, upperleft.y};
+  };
+
   bool overlaps(const BoundingBox& other) const {
-     if ((upperleft % other.upperleft) == Quadrant::NW) {
-       return (lowerright % other.upperleft) == Quadrant::SE;
-     }
-     if ((upperleft % other.lowerright) == Quadrant::SE) {
-       return (lowerright % other.lowerright) == Quadrant::NW;
-     }
-     return false;
-  }
+    return (xrange() && other.xrange()) && (yrange() && other.yrange());
+  };
 
   bool operator&&(const BoundingBox& other) const {
     return overlaps(other);
-  }
+  };
 
   bool operator&&(const Point& other) const {
     return (upperleft.x <= other.x && lowerright.x >= other.x)
         && (upperleft.y >= other.y && lowerright.y <= other.y);
-  }
+  };
+
+  double area() const {
+    return (lowerright.x - upperleft.x) * (upperleft.y - lowerright.y);
+  };
+
+  double wastedArea(const BoundingBox& other) const {
+    return (*this + other).area() - this->area() - other.area();
+  };
 };
 
 struct Polygon {
@@ -114,17 +137,18 @@ struct Polygon {
   };
 };
 
-// 12 children allows for a 496-byte RTree object, 16 bytes short of a
+// 12 children allows for a 504-byte RTree object, 8 bytes short of a
 // 512-byte block.
 constexpr static int RTREE_MAX_CHILDREN_COUNT = 12;
 constexpr static int RTREE_MIN_CHILDREN_COUNT =  6;
 
 // Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
-// Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
-// https://doi.org/10.1145/971697.602266.
+//   Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
+//   https://doi.org/10.1145/971697.602266.
 struct RTree {
   long tuple_id;
   size_t child_count;
+  RTree* parent;
   RTree* children[RTREE_MAX_CHILDREN_COUNT];
   // If we store the boudning box inside the node, then we can load
   // this block from the sd card and figure out which block to descend
