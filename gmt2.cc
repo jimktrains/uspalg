@@ -77,10 +77,6 @@ int main () {
   for (int i = 0; i < polys.size(); i++) {
     auto p = Polygon{&polys[i][0], polys[i].size()};
     auto bb = p.boundingBox();
-    if (i == 283) {
-        auto b = bb;
-            std::cout << "Want to insert [" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
-    }
     rtree.insert(bb, i);
 
     ofbb.write(reinterpret_cast<char*>( &bb.upperleft.x ), sizeof(bb.upperleft.x));
@@ -111,8 +107,7 @@ int main () {
   std::cout << "Node Count: " << nodes.size() << std::endl;
   std::cout << std::endl;
 
-  auto pghbb = BoundingBox{pittsburgh, pittsburgh};
-  for (auto r : rtree.find(pghbb)) {
+  for (auto r : rtree.find(pittsburgh)) {
     auto p = Polygon{&polys[r][0], polys[r].size()};
     auto b = p.boundingBox();
     std::cout << r << " " << names[poly_to_name[r]] << std::endl;

@@ -162,7 +162,7 @@ std::vector<RTreeNode*> nodes;
 //   Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
 //   https://doi.org/10.1145/971697.602266.
 struct RTreeNode {
-  RTreeNode(BoundingBox& bb, uint64_t i, bool isLeaf, bool hasParent, uint64_t pid)
+  RTreeNode(const BoundingBox& bb, uint64_t i, bool isLeaf, bool hasParent, uint64_t pid)
     : isLeaf{isLeaf}
     , hasParent{hasParent}
     , parentid{pid}
@@ -183,7 +183,7 @@ struct RTreeNode {
   BoundingBox children_bbox[RTREE_MAX_CHILDREN_COUNT];
   uint64_t child_tuple_or_node_id[RTREE_MAX_CHILDREN_COUNT];
 
-  uint64_t chooseLeaf(BoundingBox& bbox) {
+  uint64_t chooseLeaf(const BoundingBox& bbox) {
     if (isLeaf) {
       return myid;
     }
@@ -264,30 +264,18 @@ struct RTreeNode {
   };
 
   bool insert(BoundingBox bbox, long tuple_id) {
-      if (tuple_id == 283) {
-        auto b = bbox;
-            std::cout << "Attempted Inser [" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
-      }
     if (children_count > (RTREE_MAX_CHILDREN_COUNT - 1)) {
-      if (tuple_id == 283) {
-      std::cout << "  Failed!" << std::endl;
-      }
       return false;
     }
     children_bbox[children_count] = bbox;
     child_tuple_or_node_id[children_count] = tuple_id;
-
-      if (child_tuple_or_node_id[children_count] == 283) {
-        auto b = children_bbox[children_count];
-            std::cout << "  Insert [" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
-      }
 
     children_count++;
 
     return true;
   };
 
-  void updateBoundingBox(uint64_t cid, BoundingBox bb) {
+  void updateChildBoundingBox(uint64_t cid, BoundingBox bb) {
     for (int i = 0; i < children_count; i++) {
       if (child_tuple_or_node_id[i] == cid) {
         children_bbox[i] = bb;
@@ -298,8 +286,8 @@ struct RTreeNode {
 
   BoundingBox computeBoundingBox() {
     BoundingBox bb = children_bbox[0];
-    for (auto cbb : children_bbox) {
-      bb = bb + cbb;
+    for (int i = 1; i < children_count; i++) {
+      bb = bb + children_bbox[i];
     }
     return bb;
   };
@@ -310,7 +298,7 @@ struct RTree {
   RTreeNode* current_node = nullptr;
   RTreeNode* root = nullptr;
 
-  void chooseLeaf(BoundingBox& bbox) {
+  void chooseLeaf(const BoundingBox& bbox) {
     uint64_t next = root->myid;
 
     do {
@@ -328,12 +316,16 @@ struct RTree {
       auto cid = current_node->myid;
       auto cbb = current_node->computeBoundingBox();
       loadNode(current_node->parentid);
-      current_node->updateBoundingBox(cid, cbb);
+      current_node->updateChildBoundingBox(cid, cbb);
       updateParentBoundingBox();
     }
   };
 
-  std::vector<uint64_t> find(BoundingBox& bbox) {
+  std::vector<uint64_t> find(const Point& p) {
+    return find(BoundingBox{p,p});
+  };
+
+  std::vector<uint64_t> find(const BoundingBox& bbox) {
     std::vector<uint64_t> tocheck;
     std::vector<uint64_t> tupleids;
     int nodes_checked = 0;
@@ -341,18 +333,14 @@ struct RTree {
     while (!tocheck.empty()) {
       loadNode(tocheck.back());
       nodes_checked++;
-      std::cout << "Looking at node " << current_node->myid << std::endl;
       tocheck.pop_back();
       for(int i = 0; i < current_node->children_count; i++) {
         if (current_node->children_bbox[i] && bbox) {
           if (current_node->isLeaf) {
             tupleids.push_back(current_node->child_tuple_or_node_id[i]);
-            std::cout << "  Found a leaf " << current_node->child_tuple_or_node_id[i]<< " " << i << std::endl;
             auto b = current_node->children_bbox[i];
-            std::cout << "[" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
           } else {
             tocheck.push_back(current_node->child_tuple_or_node_id[i]);
-            std::cout << "  Will explore " << current_node->child_tuple_or_node_id[i]<< std::endl;
           }
         }
       }
@@ -361,7 +349,7 @@ struct RTree {
     return tupleids;
   };
 
-  void insert(BoundingBox bbox, long tuple_id) {
+  void insert(const BoundingBox& bbox, long tuple_id) {
     if (root == nullptr) {
         auto new_root = new RTreeNode(bbox, tuple_id, true, false, 0);
         new_root->myid = nodes.size();
@@ -376,14 +364,7 @@ struct RTree {
   }
 
   void insertPhase2(BoundingBox bbox, long tuple_id) {
-      if (tuple_id == 283) {
-        auto b = bbox;
-            std::cout << "RTree Attempted Insert " << (current_node->isLeaf ? "L" : "I")  << " [" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
-      }
     if (!current_node->insert(bbox, tuple_id)) {
-      if (tuple_id == 283) {
-        std::cout << "Splitting" << std::endl;
-      }
       auto new_node = current_node->split();
       if (bbox.wastedArea(new_node->computeBoundingBox()) < bbox.wastedArea(current_node->computeBoundingBox())){
         new_node->insert(bbox, tuple_id);
@@ -403,8 +384,9 @@ struct RTree {
       }
 
       if (current_node->hasParent) {
-        loadNode(current_node->parentid);
-        current_node->updateBoundingBox(cid, cbb);
+        auto pid = current_node->parentid;
+        updateParentBoundingBox();
+        loadNode(pid);
         insertPhase2(new_node->computeBoundingBox(), new_node->myid);
       } else {
         auto new_root = new RTreeNode(cbb, cid, false, false, 0);
