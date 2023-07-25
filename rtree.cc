@@ -3,32 +3,11 @@
 #include <math.h>
 #include <numeric>
 
-enum Quadrant {
-  NE,
-  NW,
-  SW,
-  SE,
-};
-
 struct Point {
   Qs10d21 x;
   Qs10d21 y;
 
   Point(Qs10d21 xx, Qs10d21 yy) : x{xx}, y{yy} {}
-
-  Quadrant operator%(const Point &other) const {
-    if (x < other.x) {
-      if (y < other.y) {
-        return SW;
-      }
-      return NW;
-    } else {
-      if (y < other.y) {
-        return SE;
-      }
-      return NE;
-    }
-  };
 };
 
 struct Range {
