@@ -9,6 +9,7 @@
 
 int main () {
 
+
   std::ifstream f("github.com/evansiroky/timezone-boundary-builder/releases/download/2023b/combined-shapefile-with-oceans.gmt");
   std::string line;
 
@@ -72,19 +73,26 @@ int main () {
 
 
   std::ofstream ofbb("bbox", std::ios::binary);
+  RTree rtree;
   for (int i = 0; i < polys.size(); i++) {
     auto p = Polygon{&polys[i][0], polys[i].size()};
     auto bb = p.boundingBox();
+    if (i == 283) {
+        auto b = bb;
+            std::cout << "Want to insert [" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
+    }
+    rtree.insert(bb, i);
+
     ofbb.write(reinterpret_cast<char*>( &bb.upperleft.x ), sizeof(bb.upperleft.x));
     ofbb.write(reinterpret_cast<char*>( &bb.upperleft.y ), sizeof(bb.upperleft.y));
     ofbb.write(reinterpret_cast<char*>( &bb.lowerright.x ), sizeof(bb.lowerright.x));
     ofbb.write(reinterpret_cast<char*>( &bb.lowerright.y ), sizeof(bb.lowerright.y));
 
     if (p && pittsburgh) {
-      std::cout << "Found pittsburgh in " << " " << names[poly_to_name[i]] << std::endl;
+      std::cout << "Found pittsburgh in " << i << " " << names[poly_to_name[i]] << std::endl;
     }
     if (bb && pittsburgh) {
-      std::cout << "Found pittsburgh in bb for " << names[poly_to_name[i]] << std::endl;
+      std::cout << "Found pittsburgh in bb for " << i << " " << names[poly_to_name[i]] << std::endl;
     }
     if (p && chicago) {
       std::cout << "Found chicago in " << names[poly_to_name[i]] << std::endl;
@@ -99,4 +107,16 @@ int main () {
       std::cout << "Found portland in bb for " << names[poly_to_name[i]] << std::endl;
     }
   }
+  std::cout << std::endl;
+  std::cout << "Node Count: " << nodes.size() << std::endl;
+  std::cout << std::endl;
+
+  auto pghbb = BoundingBox{pittsburgh, pittsburgh};
+  for (auto r : rtree.find(pghbb)) {
+    auto p = Polygon{&polys[r][0], polys[r].size()};
+    auto b = p.boundingBox();
+    std::cout << r << " " << names[poly_to_name[r]] << std::endl;
+    std::cout << "[" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
+  }
+
 }
