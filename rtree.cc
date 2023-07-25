@@ -234,7 +234,7 @@ struct RTreeNode {
       if (new_node->children_count > RTREE_MIN_CHILDREN_COUNT) {
         break;
       }
-      double min_wasted_j = 99999999999999999;
+      double min_wasted_j = std::numeric_limits<double>::max();
       uint8_t min_m = 0;
       for (uint8_t m = 0; m < children_count; m++) {
         auto wasted_j = j_bb.wastedArea(children_bbox[m]);
