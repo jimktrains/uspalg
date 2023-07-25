@@ -72,7 +72,7 @@ int main() {
 
   std::ofstream ofbb("bbox", std::ios::binary);
   RTree rtree;
-  for (int i = 0; i < polys.size(); i++) {
+  for (size_t i = 0; i < polys.size(); i++) {
     auto p = Polygon{&polys[i][0], polys[i].size()};
     auto bb = p.boundingBox();
     rtree.insert(bb, i);

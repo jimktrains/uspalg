@@ -71,7 +71,7 @@ struct Polygon {
     Qs10d21 mx = MAX_Qs10d21;
     BoundingBox bb{Point{mx, -mx}, Point{-mx, mx}};
 
-    for (int i = 0; i < npoints; i++) {
+    for (size_t i = 0; i < npoints; i++) {
       bb.upperleft = Point{std::min(bb.upperleft.x, points[i].x),
                            std::max(bb.upperleft.y, points[i].y)};
       bb.lowerright = Point{std::max(bb.lowerright.x, points[i].x),
@@ -104,7 +104,7 @@ struct Polygon {
   // https://wrfranklin.org/Research/Short_Notes/pnpoly.html
   bool contains(const Point &p) const {
     bool c = false;
-    for (int i = 0, j = npoints - 1; i < npoints; j = i++) {
+    for (size_t i = 0, j = npoints - 1; i < npoints; j = i++) {
       if (((points[i].y > p.y) != (points[j].y > p.y)) &&
           (p.x < (points[j].x - points[i].x) * (p.y - points[i].y) /
                          (points[j].y - points[i].y) +
@@ -138,10 +138,10 @@ struct RTreeNode {
   }
 
   uint8_t children_count;
-  uint64_t parentid;
   uint64_t myid;
   bool isLeaf;
   bool hasParent;
+  uint64_t parentid;
   // If we store the boudning box inside the node, then we can load
   // this block from the sd card and figure out which block to descend
   // into without loading anything else.
@@ -155,8 +155,8 @@ struct RTreeNode {
 
     double min_waste = children_bbox[0].wastedArea(bbox);
     double min_waste_area = children_bbox[0].area();
-    size_t min_waste_i = 0;
-    for (size_t i = 1; i < children_count; i++) {
+    uint8_t min_waste_i = 0;
+    for (uint8_t i = 1; i < children_count; i++) {
       auto wasted = children_bbox[i].wastedArea(bbox);
       auto area = children_bbox[i].area();
       if ((wasted < min_waste) ||
@@ -172,15 +172,15 @@ struct RTreeNode {
 
   RTreeNode *split() {
     double max_wasted_space = 0;
-    size_t max_wasted_i = 0;
-    size_t max_wasted_j = 0;
-    int i, j;
+    //uint8_t max_wasted_i = 0;
+    uint8_t max_wasted_j = 0;
+    uint8_t i, j;
     for (i = 0; i < (children_count - 1); i++) {
       for (j = i + 1; j < children_count; j++) {
         auto wasted_area = children_bbox[i].wastedArea(children_bbox[j]);
         if (wasted_area > max_wasted_space) {
           max_wasted_space = wasted_area;
-          max_wasted_i = i;
+          //max_wasted_i = i;
           max_wasted_j = j;
         }
       }
@@ -193,7 +193,7 @@ struct RTreeNode {
     new_node->myid = nodes.size();
     nodes.push_back(new_node);
 
-    auto i_bb = children_bbox[max_wasted_i];
+    //auto i_bb = children_bbox[max_wasted_i];
     auto j_bb = children_bbox[max_wasted_j];
 
     for (int k = max_wasted_j + 1; k < children_count; k++) {
@@ -210,8 +210,8 @@ struct RTreeNode {
         break;
       }
       double min_wasted_j = 99999999999999999;
-      int min_m = 0;
-      for (int m = 0; m < children_count; m++) {
+      uint8_t min_m = 0;
+      for (uint8_t  m = 0; m < children_count; m++) {
         auto wasted_j = j_bb.wastedArea(children_bbox[m]);
 
         if (min_wasted_j > wasted_j) {
@@ -220,7 +220,7 @@ struct RTreeNode {
       }
 
       new_node->insert(children_bbox[min_m], child_tuple_or_node_id[min_m]);
-      for (int l = min_m + 1; l < children_count; l++) {
+      for (uint8_t l = min_m + 1; l < children_count; l++) {
         children_bbox[l - 1] = children_bbox[l];
         child_tuple_or_node_id[l - 1] = child_tuple_or_node_id[l];
       }
@@ -243,7 +243,7 @@ struct RTreeNode {
   };
 
   void updateChildBoundingBox(uint64_t cid, BoundingBox bb) {
-    for (int i = 0; i < children_count; i++) {
+    for (uint8_t i = 0; i < children_count; i++) {
       if (child_tuple_or_node_id[i] == cid) {
         children_bbox[i] = bb;
         break;
@@ -253,7 +253,7 @@ struct RTreeNode {
 
   BoundingBox computeBoundingBox() {
     BoundingBox bb = children_bbox[0];
-    for (int i = 1; i < children_count; i++) {
+    for (int16_t i = 1; i < children_count; i++) {
       bb = bb + children_bbox[i];
     }
     return bb;
@@ -302,7 +302,6 @@ struct RTree {
         if (current_node->children_bbox[i] && bbox) {
           if (current_node->isLeaf) {
             tupleids.push_back(current_node->child_tuple_or_node_id[i]);
-            auto b = current_node->children_bbox[i];
           } else {
             tocheck.push_back(current_node->child_tuple_or_node_id[i]);
           }
