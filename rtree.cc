@@ -188,38 +188,77 @@ struct RTreeNode {
       return myid;
     }
 
-    double max_waste = children_bbox[0].wastedArea(bbox);
-    double max_waste_area = children_bbox[0].area();
-    size_t max_waste_i = 0;
+    double min_waste = children_bbox[0].wastedArea(bbox);
+    double min_waste_area = children_bbox[0].area();
+    size_t min_waste_i = 0;
     for (size_t i = 1; i < children_count; i++) {
       auto wasted = children_bbox[i].wastedArea(bbox);
       auto area   = children_bbox[i].area();
-      if ((wasted > max_waste) ||
-          (wasted == max_waste && area < max_waste_area)) {
-        max_waste = wasted;
-        max_waste_area = area;
-        max_waste_i = i;
+      if ((wasted < min_waste) ||
+          (wasted == min_waste && area < min_waste_area)) {
+        min_waste = wasted;
+        min_waste_area = area;
+        min_waste_i = i;
       }
     }
 
-    return child_tuple_or_node_id[max_waste_i];
+    return child_tuple_or_node_id[min_waste_i];
   };
 
   RTreeNode* split() {
-    // TODO: Do the actual computation to do the split correctly.
-    children_count--;
-    RTreeNode *new_node = new RTreeNode(children_bbox[children_count], child_tuple_or_node_id[children_count], isLeaf, true, parentid);
-    for (children_count--; children_count > RTREE_MIN_CHILDREN_COUNT; children_count--) {
-      new_node->insert(children_bbox[children_count], child_tuple_or_node_id[children_count]);
-      if (child_tuple_or_node_id[children_count] == 283) {
-        auto b = children_bbox[children_count];
-            std::cout << "Split " << (isLeaf ? "L" : "I") << " [" << (double)b.upperleft.x << " " << (double)b.upperleft.y << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y << "]" << std::endl;
+    double max_wasted_space = 0;
+    size_t max_wasted_i = 0;
+    size_t max_wasted_j = 0;
+    int i,j;
+    for (i = 0; i < (children_count - 1); i++) {
+      for (j = i+1; j < children_count; j++) {
+        auto wasted_area = children_bbox[i].wastedArea(children_bbox[j]);
+        if (wasted_area > max_wasted_space) {
+          max_wasted_space = wasted_area;
+          max_wasted_i = i;
+          max_wasted_j = j;
+        }
       }
     }
 
+    auto new_node = new RTreeNode(children_bbox[max_wasted_j], child_tuple_or_node_id[max_wasted_j], isLeaf, true, parentid);
     // Not thread-safe.
     new_node->myid = nodes.size();
     nodes.push_back(new_node);
+
+    auto i_bb = children_bbox[max_wasted_i];
+    auto j_bb = children_bbox[max_wasted_j];
+
+    for (int k = max_wasted_j+1; k < children_count; k++) {
+      children_bbox[k-1] = children_bbox[k];
+      child_tuple_or_node_id[k-1] = child_tuple_or_node_id[k];
+    }
+    children_count--;
+
+    for (int k = 0; k < children_count; k++) {
+      if (children_count < RTREE_MIN_CHILDREN_COUNT) {
+        break;
+      }
+      if (new_node->children_count > RTREE_MIN_CHILDREN_COUNT) {
+        break;
+      }
+      double min_wasted_j = 99999999999999999;
+      int min_m = 0;
+      for (int m = 0; m < children_count; m++) {
+        auto wasted_j = j_bb.wastedArea(children_bbox[m]);
+
+        if (min_wasted_j > wasted_j) {
+          min_m = m;
+        }
+      }
+
+      new_node->insert(children_bbox[min_m], child_tuple_or_node_id[min_m]);
+      for (int l = min_m+1; l < children_count; l++) {
+        children_bbox[l-1] = children_bbox[l];
+        child_tuple_or_node_id[l-1] = child_tuple_or_node_id[l];
+      }
+      children_count--;
+    }
 
     return new_node;
   };
@@ -297,9 +336,11 @@ struct RTree {
   std::vector<uint64_t> find(BoundingBox& bbox) {
     std::vector<uint64_t> tocheck;
     std::vector<uint64_t> tupleids;
+    int nodes_checked = 0;
     tocheck.push_back(root->myid);
     while (!tocheck.empty()) {
       loadNode(tocheck.back());
+      nodes_checked++;
       std::cout << "Looking at node " << current_node->myid << std::endl;
       tocheck.pop_back();
       for(int i = 0; i < current_node->children_count; i++) {
@@ -316,6 +357,7 @@ struct RTree {
         }
       }
     }
+    std::cout << "Nodes checked: " << nodes_checked << std::endl;
     return tupleids;
   };
 
@@ -343,7 +385,11 @@ struct RTree {
         std::cout << "Splitting" << std::endl;
       }
       auto new_node = current_node->split();
-      current_node->insert(bbox, tuple_id);
+      if (bbox.wastedArea(new_node->computeBoundingBox()) < bbox.wastedArea(current_node->computeBoundingBox())){
+        new_node->insert(bbox, tuple_id);
+      } else {
+        current_node->insert(bbox, tuple_id);
+      }
       auto cid = current_node->myid;
       auto cbb = current_node->computeBoundingBox();
 
