@@ -1,7 +1,27 @@
-#include "qs10d21.cc"
-#include <limits>
+/*
+ *  uspal - micro spatial algorithms
+ *  Copyright (C) 2023  James Keener <jim@jimkeener.com>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU Affero General Public License as
+ *  published by the Free Software Foundation, either version 3 of the
+ *  License, or (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Affero General Public License for more details.
+ *
+ *  You should have received a copy of the GNU Affero General Public License
+ *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 #include <math.h>
+
+#include <limits>
 #include <numeric>
+#include <vector>
+
+#include "qs10d21.cc"
 
 struct Point {
   Qs10d21 x;
@@ -15,10 +35,10 @@ struct Range {
   Qs10d21 end;
 
   bool overlaps(const Range &other) {
-    return start <= other.end and end >= other.start;
-  };
+    return start <= other.end && end >= other.start;
+  }
 
-  bool operator&&(const Range &other) { return overlaps(other); };
+  bool operator&&(const Range &other) { return overlaps(other); }
 };
 
 struct BoundingBox {
@@ -36,31 +56,31 @@ struct BoundingBox {
                              std::max(upperleft.y, other.upperleft.y)},
                        Point{std::max(lowerright.x, other.lowerright.x),
                              std::min(lowerright.y, other.lowerright.y)}};
-  };
+  }
 
-  Range xrange() const { return Range{upperleft.x, lowerright.x}; };
+  Range xrange() const { return Range{upperleft.x, lowerright.x}; }
 
-  Range yrange() const { return Range{lowerright.y, upperleft.y}; };
+  Range yrange() const { return Range{lowerright.y, upperleft.y}; }
 
   bool overlaps(const BoundingBox &other) const {
     return (xrange() && other.xrange()) && (yrange() && other.yrange());
-  };
+  }
 
-  bool operator&&(const BoundingBox &other) const { return overlaps(other); };
+  bool operator&&(const BoundingBox &other) const { return overlaps(other); }
 
   bool operator&&(const Point &other) const {
     return (upperleft.x <= other.x && lowerright.x >= other.x) &&
            (upperleft.y >= other.y && lowerright.y <= other.y);
-  };
+  }
 
   double area() const {
-    return ((double)(lowerright.x - upperleft.x)) *
-           ((double)(upperleft.y - lowerright.y));
-  };
+    return (static_cast<double>(lowerright.x - upperleft.x)) *
+           (static_cast<double>(upperleft.y - lowerright.y));
+  }
 
   double wastedArea(const BoundingBox &other) const {
     return (*this + other).area() - this->area() - other.area();
-  };
+  }
 };
 
 struct Polygon {
@@ -81,27 +101,29 @@ struct Polygon {
     return bb;
   }
 
-  // > The Method
-  // > I run a semi-infinite ray horizontally (increasing x, fixed y) out from
-  // > the test point, and count how many edges it crosses. At each crossing,
-  // the > ray switches between inside and outside. This is called the Jordan
-  // curve > theorem.
-  // >
-  // > The case of the ray going thru a vertex is handled correctly
-  // > via a careful selection of inequalities. Don't mess with this code unless
-  // > you're familiar with the idea of Simulation of Simplicity. This pretends
-  // > to shift the ray infinitesimally down so that it either clearly
-  // > intersects, or clearly doesn't touch. Since this is merely a conceptual,
-  // > infinitesimal, shift, it never creates an intersection that didn't exist
-  // > before, and never destroys an intersection that clearly existed before.
-  // >
-  // > The ray is tested against each edge thus:
-  // >
-  // >     Is the point in the half-plane to the left of the extended edge? and
-  // >     Is the point's Y coordinate within the edge's Y-range?
-  // >
-  // > Handling endpoints here is tricky.
-  // https://wrfranklin.org/Research/Short_Notes/pnpoly.html
+  /*
+   * > The Method
+   * > I run a semi-infinite ray horizontally (increasing x, fixed y) out from
+   * > the test point, and count how many edges it crosses. At each crossing,
+   * the > ray switches between inside and outside. This is called the Jordan
+   * curve > theorem.
+   * >
+   * > The case of the ray going thru a vertex is handled correctly
+   * > via a careful selection of inequalities. Don't mess with this code unless
+   * > you're familiar with the idea of Simulation of Simplicity. This pretends
+   * > to shift the ray infinitesimally down so that it either clearly
+   * > intersects, or clearly doesn't touch. Since this is merely a conceptual,
+   * > infinitesimal, shift, it never creates an intersection that didn't exist
+   * > before, and never destroys an intersection that clearly existed before.
+   * >
+   * > The ray is tested against each edge thus:
+   * >
+   * >     Is the point in the half-plane to the left of the extended edge? and
+   * >     Is the point's Y coordinate within the edge's Y-range?
+   * >
+   * > Handling endpoints here is tricky.
+   * https://wrfranklin.org/Research/Short_Notes/pnpoly.html
+   */
   bool contains(const Point &p) const {
     bool c = false;
     for (size_t i = 0, j = npoints - 1; i < npoints; j = i++) {
@@ -112,9 +134,9 @@ struct Polygon {
         c = !c;
     }
     return c;
-  };
+  }
 
-  bool operator&&(const Point &p) const { return contains(p); };
+  bool operator&&(const Point &p) const { return contains(p); }
 };
 
 constexpr static int RTREE_MAX_CHILDREN_COUNT = 15;
@@ -122,12 +144,13 @@ constexpr static int RTREE_MIN_CHILDREN_COUNT = RTREE_MAX_CHILDREN_COUNT / 2;
 
 struct RTreeNode;
 
-#include <vector>
 std::vector<RTreeNode *> nodes;
 
-// Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
-//   Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
-//   https://doi.org/10.1145/971697.602266.
+/*
+ * Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
+ *   Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
+ *   https://doi.org/10.1145/971697.602266.
+ */
 struct RTreeNode {
   RTreeNode(const BoundingBox &bb, uint64_t i, bool isLeaf, bool hasParent,
             uint64_t pid)
@@ -142,9 +165,11 @@ struct RTreeNode {
   bool isLeaf;
   bool hasParent;
   uint64_t parentid;
-  // If we store the boudning box inside the node, then we can load
-  // this block from the sd card and figure out which block to descend
-  // into without loading anything else.
+  /*
+   * If we store the boudning box inside the node, then we can load
+   * this block from the sd card and figure out which block to descend
+   * into without loading anything else.
+   */
   BoundingBox children_bbox[RTREE_MAX_CHILDREN_COUNT];
   uint64_t child_tuple_or_node_id[RTREE_MAX_CHILDREN_COUNT];
 
@@ -168,11 +193,11 @@ struct RTreeNode {
     }
 
     return child_tuple_or_node_id[min_waste_i];
-  };
+  }
 
   RTreeNode *split() {
     double max_wasted_space = 0;
-    //uint8_t max_wasted_i = 0;
+    // uint8_t max_wasted_i = 0;
     uint8_t max_wasted_j = 0;
     uint8_t i, j;
     for (i = 0; i < (children_count - 1); i++) {
@@ -180,7 +205,7 @@ struct RTreeNode {
         auto wasted_area = children_bbox[i].wastedArea(children_bbox[j]);
         if (wasted_area > max_wasted_space) {
           max_wasted_space = wasted_area;
-          //max_wasted_i = i;
+          // max_wasted_i = i;
           max_wasted_j = j;
         }
       }
@@ -193,7 +218,7 @@ struct RTreeNode {
     new_node->myid = nodes.size();
     nodes.push_back(new_node);
 
-    //auto i_bb = children_bbox[max_wasted_i];
+    // auto i_bb = children_bbox[max_wasted_i];
     auto j_bb = children_bbox[max_wasted_j];
 
     for (int k = max_wasted_j + 1; k < children_count; k++) {
@@ -211,7 +236,7 @@ struct RTreeNode {
       }
       double min_wasted_j = 99999999999999999;
       uint8_t min_m = 0;
-      for (uint8_t  m = 0; m < children_count; m++) {
+      for (uint8_t m = 0; m < children_count; m++) {
         auto wasted_j = j_bb.wastedArea(children_bbox[m]);
 
         if (min_wasted_j > wasted_j) {
@@ -228,9 +253,9 @@ struct RTreeNode {
     }
 
     return new_node;
-  };
+  }
 
-  bool insert(BoundingBox bbox, long tuple_id) {
+  bool insert(BoundingBox bbox, uint64_t tuple_id) {
     if (children_count > (RTREE_MAX_CHILDREN_COUNT - 1)) {
       return false;
     }
@@ -240,7 +265,7 @@ struct RTreeNode {
     children_count++;
 
     return true;
-  };
+  }
 
   void updateChildBoundingBox(uint64_t cid, BoundingBox bb) {
     for (uint8_t i = 0; i < children_count; i++) {
@@ -249,7 +274,7 @@ struct RTreeNode {
         break;
       }
     }
-  };
+  }
 
   BoundingBox computeBoundingBox() {
     BoundingBox bb = children_bbox[0];
@@ -257,9 +282,13 @@ struct RTreeNode {
       bb = bb + children_bbox[i];
     }
     return bb;
-  };
+  }
 };
 
+// This is written to only ever access one preëxisting node plus
+// potentially one new node at a time to think about how this
+// will work on a microcontroller where I may only have access
+// to one node at a time when searching.
 struct RTree {
   RTreeNode *current_node = nullptr;
   RTreeNode *root = nullptr;
@@ -271,9 +300,9 @@ struct RTree {
       loadNode(next);
       next = current_node->chooseLeaf(bbox);
     } while (next != current_node->myid);
-  };
+  }
 
-  void loadNode(uint64_t i) { current_node = nodes[i]; };
+  void loadNode(uint64_t i) { current_node = nodes[i]; }
 
   void updateParentBoundingBox() {
     if (current_node->hasParent) {
@@ -283,11 +312,9 @@ struct RTree {
       current_node->updateChildBoundingBox(cid, cbb);
       updateParentBoundingBox();
     }
-  };
+  }
 
-  std::vector<uint64_t> find(const Point &p) {
-    return find(BoundingBox{p, p});
-  };
+  std::vector<uint64_t> find(const Point &p) { return find(BoundingBox{p, p}); }
 
   std::vector<uint64_t> find(const BoundingBox &bbox) {
     std::vector<uint64_t> tocheck;
@@ -310,9 +337,9 @@ struct RTree {
     }
     std::cout << "Nodes checked: " << nodes_checked << std::endl;
     return tupleids;
-  };
+  }
 
-  void insert(const BoundingBox &bbox, long tuple_id) {
+  void insert(const BoundingBox &bbox, uint64_t tuple_id) {
     if (root == nullptr) {
       auto new_root = new RTreeNode(bbox, tuple_id, true, false, 0);
       new_root->myid = nodes.size();
@@ -326,7 +353,7 @@ struct RTree {
     insertPhase2(bbox, tuple_id);
   }
 
-  void insertPhase2(BoundingBox bbox, long tuple_id) {
+  void insertPhase2(BoundingBox bbox, uint64_t tuple_id) {
     if (!current_node->insert(bbox, tuple_id)) {
       auto new_node = current_node->split();
       if (bbox.wastedArea(new_node->computeBoundingBox()) <
@@ -367,5 +394,5 @@ struct RTree {
     } else {
       updateParentBoundingBox();
     }
-  };
+  }
 };

@@ -38,7 +38,7 @@ int main() {
       }
       double x, y;
       sscanf(line.c_str(), "%lf %lf", &x, &y);
-      polys.back().emplace_back(x, y);
+      polys.back().emplace_back(Qs10d21(x), Qs10d21(y));
     }
   }
 
@@ -66,9 +66,9 @@ int main() {
             << "Objects:  " << names.size() << std::endl
             << "Polygons: " << polys.size() << std::endl;
 
-  auto pittsburgh = Point(-80.0, 40.44);
-  auto chicago = Point(-87.65, 41.85);
-  auto portland = Point(-122.66, 45.51);
+  auto pittsburgh = Point(Qs10d21(-80.0), Qs10d21(40.44));
+  auto chicago = Point(Qs10d21(-87.65), Qs10d21(41.85));
+  auto portland = Point(Qs10d21(-122.66), Qs10d21(45.51));
 
   std::ofstream ofbb("bbox", std::ios::binary);
   RTree rtree;
