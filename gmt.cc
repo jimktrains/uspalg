@@ -1,13 +1,14 @@
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <fstream>
-#include <vector>
 #include <utility>
+#include <vector>
 
-int main () {
-  std::ifstream f("github.com/evansiroky/timezone-boundary-builder/releases/download/2023b/combined-shapefile-with-oceans.gmt");
+int main() {
+  std::ifstream f("github.com/evansiroky/timezone-boundary-builder/releases/"
+                  "download/2023b/combined-shapefile-with-oceans.gmt");
   std::string line;
 
   int state = 0;
@@ -32,22 +33,21 @@ int main () {
       polys.emplace_back();
       poly_to_name.emplace_back(names.size() - 1);
     } else {
-      double x,y;
+      double x, y;
       sscanf(line.c_str(), "%lf %lf", &x, &y);
-      polys.back().emplace_back(x,y);
+      polys.back().emplace_back(x, y);
     }
   }
 
-
   std::ofstream of("polys", std::ios::binary);
   uint32_t n = polys.size();
-  of.write(reinterpret_cast<char*>( &n ), sizeof(n));
+  of.write(reinterpret_cast<char *>(&n), sizeof(n));
   for (auto i : polys) {
     n = i.size();
-    of.write(reinterpret_cast<char*>( &n ), sizeof(n));
+    of.write(reinterpret_cast<char *>(&n), sizeof(n));
     for (auto j : i) {
-      of.write(reinterpret_cast<char*>( &j.first ), sizeof(j.first));
-      of.write(reinterpret_cast<char*>( &j.second), sizeof(j.second));
+      of.write(reinterpret_cast<char *>(&j.first), sizeof(j.first));
+      of.write(reinterpret_cast<char *>(&j.second), sizeof(j.second));
     }
   }
 

@@ -7,11 +7,7 @@ struct Time {
   int minutes;
   int seconds;
 
-  Time(long d, int h, int m, int s)
-    : days{d}
-    , hour{h}
-    , minutes{m}
-    , seconds{s} {
+  Time(long d, int h, int m, int s) : days{d}, hour{h}, minutes{m}, seconds{s} {
 
     // Leap Seconds aren't handled -_- and I don't care :o -- JSK
     if (-60 >= seconds || seconds >= 60) {
@@ -30,22 +26,18 @@ struct Time {
     }
   }
 
-  Time operator-(const Time& other) const {
-    return Time(days - other.days,
-                hour - other.hour,
-                minutes - other.minutes,
+  Time operator-(const Time &other) const {
+    return Time(days - other.days, hour - other.hour, minutes - other.minutes,
                 seconds - other.seconds);
   };
 
-  Time operator+(const Time& other) const {
-    return Time(days + other.days,
-                hour + other.hour,
-                minutes + other.minutes,
+  Time operator+(const Time &other) const {
+    return Time(days + other.days, hour + other.hour, minutes + other.minutes,
                 seconds + other.seconds);
   };
 
   double decimalDay() const {
-    return days + (((((seconds/60.0) + minutes)/60.0) + hour) / 24.0);
+    return days + (((((seconds / 60.0) + minutes) / 60.0) + hour) / 24.0);
   };
 };
 
@@ -66,16 +58,24 @@ struct JulianDay {
     return jd % 7;
   };
 
-  std::string  namedDayOfWeekShort() const {
-    switch(dayOfWeek()) {
-      case 0: return "Sun";
-      case 1: return "Mon";
-      case 2: return "Tue";
-      case 3: return "Wed";
-      case 4: return "Thu";
-      case 5: return "Fri";
-      case 6: return "Sat";
-      default: return "Unk";
+  std::string namedDayOfWeekShort() const {
+    switch (dayOfWeek()) {
+    case 0:
+      return "Sun";
+    case 1:
+      return "Mon";
+    case 2:
+      return "Tue";
+    case 3:
+      return "Wed";
+    case 4:
+      return "Thu";
+    case 5:
+      return "Fri";
+    case 6:
+      return "Sat";
+    default:
+      return "Unk";
     };
   }
 
@@ -94,7 +94,6 @@ struct JulianDay {
     return Time{d, h, m, s};
   };
 };
-
 
 struct GregorianDate {
   int year;
@@ -122,29 +121,43 @@ struct GregorianDate {
       m += 12;
     }
 
-    long a = y/100;
-    long b = 2 - a + (a/4);
+    long a = y / 100;
+    long b = 2 - a + (a / 4);
 
-    double jd = (long)(365.25 * (y + 4716)) + (long)(30.6001 * (m+1)) + (d + b - 1524.5);
+    double jd = (long)(365.25 * (y + 4716)) + (long)(30.6001 * (m + 1)) +
+                (d + b - 1524.5);
 
     return jd;
   };
 
   std::string monthNameShort() {
     switch (month) {
-      case  1: return "Jan";
-      case  2: return "Feb";
-      case  3: return "Mar";
-      case  4: return "Apr";
-      case  5: return "May";
-      case  6: return "Jun";
-      case  7: return "Jul";
-      case  8: return "Aug";
-      case  9: return "Sep";
-      case 10: return "Oct";
-      case 11: return "Nov";
-      case 12: return "Dec";
-      default: return "Unk";
+    case 1:
+      return "Jan";
+    case 2:
+      return "Feb";
+    case 3:
+      return "Mar";
+    case 4:
+      return "Apr";
+    case 5:
+      return "May";
+    case 6:
+      return "Jun";
+    case 7:
+      return "Jul";
+    case 8:
+      return "Aug";
+    case 9:
+      return "Sep";
+    case 10:
+      return "Oct";
+    case 11:
+      return "Nov";
+    case 12:
+      return "Dec";
+    default:
+      return "Unk";
     };
   };
 
@@ -170,7 +183,7 @@ struct GregorianDate {
     if (isLeapYear()) {
       k = 1;
     }
-    auto n = (275 * month)/9 - (k * ((month + 9)/12)) + day - 30;
+    auto n = (275 * month) / 9 - (k * ((month + 9) / 12)) + day - 30;
     return n;
   };
 
@@ -179,7 +192,7 @@ struct GregorianDate {
   //
   // N.B.: "The following method is valid for positive as well as for
   // negative years, but not for negative Julian Day numbers."
-  GregorianDate static toGregorianDate(const JulianDay& j) {
+  GregorianDate static toGregorianDate(const JulianDay &j) {
     auto jd = j.jd;
 
     jd += 0.5;
@@ -188,14 +201,14 @@ struct GregorianDate {
     auto a = z;
 
     if (z >= 2299161) {
-      auto α = (long)((z - 1867216.25)/36524.25);
+      auto α = (long)((z - 1867216.25) / 36524.25);
       a = z + 1 + α - (long)(α / 4.0);
     }
 
     auto b = a + 1524;
-    auto c = (long)((b - 122.1)/365.25);
+    auto c = (long)((b - 122.1) / 365.25);
     auto d = (long)(365.25 * c);
-    auto e = (long)((b - d)/30.6001);
+    auto e = (long)((b - d) / 30.6001);
 
     auto day = (double)(b - d - (long)(30.6001 * e) + f);
     auto month = (unsigned int)(e - 1);

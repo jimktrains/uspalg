@@ -1,6 +1,6 @@
-#include <iostream>
 #include <bitset>
 #include <cstdint>
+#include <iostream>
 // I'd template this, but I'm not sure how I'd go about getting the double
 // sized type for multiplication.
 //
@@ -31,99 +31,98 @@ class Qs10d21 {
 
   Qs10d21(uint32_t v) : value{v} {};
 
-    // Converts between a the signed-magnitude and twos-complement
-    // representations of the number.
-    Qs10d21 twosComplementIfNegative() const {
-      // This bit shifting maddness is all in an attempt
-      // to avoid if-statements for negative numbers.
-      //
-      // It's OK to cast to int32 because we're just using this to grab
-      // the sign bit and not a value.
-      return Qs10d21{((((int32_t)value)>>31) & (~value + 1 + (1 << 31))) | (((~((int32_t)value)>>31) & value))};
-    };
+  // Converts between a the signed-magnitude and twos-complement
+  // representations of the number.
+  Qs10d21 twosComplementIfNegative() const {
+    // This bit shifting maddness is all in an attempt
+    // to avoid if-statements for negative numbers.
+    //
+    // It's OK to cast to int32 because we're just using this to grab
+    // the sign bit and not a value.
+    return Qs10d21{((((int32_t)value) >> 31) & (~value + 1 + (1 << 31))) |
+                   (((~((int32_t)value) >> 31) & value))};
+  };
 
-  public:
-    uint32_t value;
+public:
+  uint32_t value;
 
-    static Qs10d21 rawInit(uint32_t x) { return Qs10d21(x); }
+  static Qs10d21 rawInit(uint32_t x) { return Qs10d21(x); }
 
-    Qs10d21(double x) {
-      int s = 0;
-      if (x < 0) {
-        x *= -1;
-        s = 1 << 31;
-      }
-
-      uint32_t i = ((uint32_t)x);
-      uint32_t f = ((uint32_t)((x-i)*(1<<21)));
-
-      value = s + (i << 21) + f;
-    };
-
-    Qs10d21 operator-() const {
-      return Qs10d21{value ^ (1<<31)};
-    };
-
-    Qs10d21 operator+(const Qs10d21& other) const {
-      return Qs10d21{(twosComplementIfNegative().value + other.twosComplementIfNegative().value)}.twosComplementIfNegative();
+  Qs10d21(double x) {
+    int s = 0;
+    if (x < 0) {
+      x *= -1;
+      s = 1 << 31;
     }
 
-    Qs10d21 operator-(const Qs10d21& other) const {
-      return *this + -other;
+    uint32_t i = ((uint32_t)x);
+    uint32_t f = ((uint32_t)((x - i) * (1 << 21)));
+
+    value = s + (i << 21) + f;
+  };
+
+  Qs10d21 operator-() const { return Qs10d21{value ^ (1 << 31)}; };
+
+  Qs10d21 operator+(const Qs10d21 &other) const {
+    return Qs10d21{(twosComplementIfNegative().value +
+                    other.twosComplementIfNegative().value)}
+        .twosComplementIfNegative();
+  }
+
+  Qs10d21 operator-(const Qs10d21 &other) const { return *this + -other; }
+
+  Qs10d21 operator*(const Qs10d21 &other) const {
+    uint32_t n = (value & (1 << 31)) ^ (other.value & (1 << 31));
+    uint32_t t = value & ~(1 << 31);
+    uint32_t o = other.value & ~(1 << 31);
+    uint32_t m = (((int64_t)t) * o) >> 21;
+    m |= n;
+    return Qs10d21(m);
+  }
+
+  Qs10d21 operator/(const Qs10d21 &other) const {
+    uint32_t n = (value & (1 << 31)) ^ (other.value & (1 << 31));
+    uint32_t t = value & ~(1 << 31);
+    uint32_t o = other.value & ~(1 << 31);
+    uint32_t m = ((((uint64_t)t) << 21) / o);
+    return Qs10d21(n | m);
+  }
+
+  bool operator==(const Qs10d21 &other) const { return value == other.value; };
+
+  bool operator<(const Qs10d21 &other) const {
+    return (int32_t)twosComplementIfNegative().value <
+           (int32_t)other.twosComplementIfNegative().value;
+  };
+
+  bool operator<=(const Qs10d21 &other) const {
+    return (int32_t)twosComplementIfNegative().value <=
+           (int32_t)other.twosComplementIfNegative().value;
+  };
+
+  bool operator>(const Qs10d21 &other) const {
+    return (int32_t)twosComplementIfNegative().value >
+           (int32_t)other.twosComplementIfNegative().value;
+  };
+
+  bool operator>=(const Qs10d21 &other) const {
+    return (int32_t)twosComplementIfNegative().value >=
+           (int32_t)other.twosComplementIfNegative().value;
+  };
+
+  explicit operator double() const {
+    uint32_t x = value;
+    int32_t s = 1;
+    if (x & (1 << 31)) {
+      s = -1;
     }
+    // Clear the sign bit since it's been taken care of.
+    x &= ~(1 << 31);
+    uint32_t i = x >> 21;
+    double f = (x / ((double)(1 << 21))) - i;
 
-    Qs10d21 operator*(const Qs10d21& other) const {
-     uint32_t n = (value & (1 << 31)) ^ (other.value & (1 << 31));
-     uint32_t t = value & ~(1 << 31);
-     uint32_t o = other.value & ~(1 << 31);
-     uint32_t m = (((int64_t)t) * o) >> 21;
-      m |= n;
-      return Qs10d21(m);
-    }
-
-    Qs10d21 operator/(const Qs10d21& other) const {
-     uint32_t n = (value & (1 << 31)) ^ (other.value & (1 << 31));
-     uint32_t t = value & ~(1 << 31);
-     uint32_t o = other.value & ~(1 << 31);
-     uint32_t m = ((((uint64_t)t) << 21) / o);
-      return Qs10d21(n | m);
-    }
-
-    bool operator==(const Qs10d21& other) const {
-      return value == other.value;
-    };
-
-    bool operator<(const Qs10d21& other) const {
-      return (int32_t)twosComplementIfNegative().value < (int32_t)other.twosComplementIfNegative().value;
-    };
-
-    bool operator<=(const Qs10d21& other) const {
-      return (int32_t)twosComplementIfNegative().value <= (int32_t)other.twosComplementIfNegative().value;
-    };
-
-    bool operator>(const Qs10d21& other) const {
-      return (int32_t)twosComplementIfNegative().value > (int32_t)other.twosComplementIfNegative().value;
-    };
-
-    bool operator>=(const Qs10d21& other) const {
-      return (int32_t)twosComplementIfNegative().value >= (int32_t)other.twosComplementIfNegative().value;
-    };
-
-
-    explicit operator double() const {
-      uint32_t x = value;
-      int32_t s = 1;
-      if (x & (1 << 31)) {
-        s = -1;
-      }
-      // Clear the sign bit since it's been taken care of.
-      x &= ~(1 << 31);
-      uint32_t  i = x >> 21;
-      double   f = (x / ((double)(1 << 21))) - i ;
-
-      return s*(i + f);
-    };
-
+    return s * (i + f);
+  };
 };
 
 static const Qs10d21 MAX_Qs10d21 = -Qs10d21::rawInit(~((uint32_t)0));
@@ -184,4 +183,3 @@ int main() {
 };
 
 */
-
