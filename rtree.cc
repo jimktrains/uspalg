@@ -100,20 +100,21 @@ struct BoundingBox {
 };
 
 struct Entry {
-  Entry(BoundingBox &bb, uint64_t &tuple_id) : bb{bb}, tuple_id{tuple_id} {}
+  Entry() {}
+  Entry(BoundingBox bbox, uint64_t tuple_id) : bbox{bbox}, tuple_id{tuple_id} {}
 
-  BoundingBox bb;
+  BoundingBox bbox;
   uint64_t tuple_id;
 
   // Sorting like this for the STR algorithm.
   bool operator<(const Entry &other) const {
-    if (bb.center().x < other.bb.center().x) {
+    if (bbox.center().x < other.bbox.center().x) {
       return true;
     }
-    if (bb.center().x > other.bb.center().x) {
+    if (bbox.center().x > other.bbox.center().x) {
       return false;
     }
-    return bb.center().y < other.bb.center().y;
+    return bbox.center().y < other.bbox.center().y;
   }
 };
 
@@ -180,12 +181,13 @@ std::vector<RTreeNode *> nodes;
  *   NASA Contract No. NAS1-19480
  */
 struct RTreeNode {
-  RTreeNode(const BoundingBox &bb, uint64_t i, bool isLeaf, bool hasParent,
-            uint64_t pid)
-      : isLeaf{isLeaf}, hasParent{hasParent}, parentid{pid} {
+  RTreeNode(const Entry& e, bool il, bool hp,
+            uint64_t pid){
+    isLeaf = il;
+    hasParent = hp;
+    parentid = pid;
     children_count = 1;
-    children_bbox[0] = bb;
-    child_tuple_or_node_id[0] = i;
+    children[0] = e;
   }
 
   uint8_t children_count;
@@ -198,20 +200,19 @@ struct RTreeNode {
    * this block from the sd card and figure out which block to descend
    * into without loading anything else.
    */
-  BoundingBox children_bbox[RTREE_MAX_CHILDREN_COUNT];
-  uint64_t child_tuple_or_node_id[RTREE_MAX_CHILDREN_COUNT];
+  Entry children[RTREE_MAX_CHILDREN_COUNT];
 
   uint64_t chooseLeaf(const BoundingBox &bbox) {
     if (isLeaf) {
       return myid;
     }
 
-    double min_waste = children_bbox[0].wastedArea(bbox);
-    double min_waste_area = children_bbox[0].area();
+    double min_waste = children[0].bbox.wastedArea(bbox);
+    double min_waste_area = children[0].bbox.area();
     uint8_t min_waste_i = 0;
     for (uint8_t i = 1; i < children_count; i++) {
-      auto wasted = children_bbox[i].wastedArea(bbox);
-      auto area = children_bbox[i].area();
+      auto wasted = children[i].bbox.wastedArea(bbox);
+      auto area = children[i].bbox.area();
       if ((wasted < min_waste) ||
           (wasted == min_waste && area < min_waste_area)) {
         min_waste = wasted;
@@ -220,7 +221,7 @@ struct RTreeNode {
       }
     }
 
-    return child_tuple_or_node_id[min_waste_i];
+    return children[min_waste_i].tuple_id;
   }
 
   RTreeNode *split() {
@@ -230,7 +231,7 @@ struct RTreeNode {
     uint8_t i, j;
     for (i = 0; i < (children_count - 1); i++) {
       for (j = i + 1; j < children_count; j++) {
-        auto wasted_area = children_bbox[i].wastedArea(children_bbox[j]);
+        auto wasted_area = children[i].bbox.wastedArea(children[j].bbox);
         if (wasted_area > max_wasted_space) {
           max_wasted_space = wasted_area;
           // max_wasted_i = i;
@@ -239,19 +240,17 @@ struct RTreeNode {
       }
     }
 
-    auto new_node = new RTreeNode(children_bbox[max_wasted_j],
-                                  child_tuple_or_node_id[max_wasted_j], isLeaf,
-                                  true, parentid);
+    auto new_node = new RTreeNode(children[max_wasted_j], isLeaf, true, parentid);
     // Not thread-safe.
     new_node->myid = nodes.size();
     nodes.push_back(new_node);
 
-    // auto i_bb = children_bbox[max_wasted_i];
-    auto j_bb = children_bbox[max_wasted_j];
+    // auto i_bb = children[max_wasted_i].bbox;
+    auto j_bb = children[max_wasted_j].bbox;
 
     for (int k = max_wasted_j + 1; k < children_count; k++) {
-      children_bbox[k - 1] = children_bbox[k];
-      child_tuple_or_node_id[k - 1] = child_tuple_or_node_id[k];
+      children[k - 1].bbox = children[k].bbox;
+      children[k - 1].tuple_id = children[k].tuple_id;
     }
     children_count--;
 
@@ -265,17 +264,17 @@ struct RTreeNode {
       double min_wasted_j = std::numeric_limits<double>::max();
       uint8_t min_m = 0;
       for (uint8_t m = 0; m < children_count; m++) {
-        auto wasted_j = j_bb.wastedArea(children_bbox[m]);
+        auto wasted_j = j_bb.wastedArea(children[m].bbox);
 
         if (min_wasted_j > wasted_j) {
           min_m = m;
         }
       }
 
-      new_node->insert(children_bbox[min_m], child_tuple_or_node_id[min_m]);
+      new_node->insert(children[min_m]);
       for (uint8_t l = min_m + 1; l < children_count; l++) {
-        children_bbox[l - 1] = children_bbox[l];
-        child_tuple_or_node_id[l - 1] = child_tuple_or_node_id[l];
+        children[l - 1].bbox = children[l].bbox;
+        children[l - 1].tuple_id = children[l].tuple_id;
       }
       children_count--;
     }
@@ -283,12 +282,11 @@ struct RTreeNode {
     return new_node;
   }
 
-  bool insert(BoundingBox bbox, uint64_t tuple_id) {
+  bool insert(const Entry& e) {
     if (children_count > (RTREE_MAX_CHILDREN_COUNT - 1)) {
       return false;
     }
-    children_bbox[children_count] = bbox;
-    child_tuple_or_node_id[children_count] = tuple_id;
+    children[children_count] = e;
 
     children_count++;
 
@@ -297,17 +295,17 @@ struct RTreeNode {
 
   void updateChildBoundingBox(uint64_t cid, BoundingBox bb) {
     for (uint8_t i = 0; i < children_count; i++) {
-      if (child_tuple_or_node_id[i] == cid) {
-        children_bbox[i] = bb;
+      if (children[i].tuple_id == cid) {
+        children[i].bbox = bb;
         break;
       }
     }
   }
 
   BoundingBox computeBoundingBox() {
-    BoundingBox bb = children_bbox[0];
+    BoundingBox bb = children[0].bbox;
     for (int16_t i = 1; i < children_count; i++) {
-      bb = bb + children_bbox[i];
+      bb = bb + children[i].bbox;
     }
     return bb;
   }
@@ -354,11 +352,11 @@ struct RTree {
       nodes_checked++;
       tocheck.pop_back();
       for (int i = 0; i < current_node->children_count; i++) {
-        if (current_node->children_bbox[i] && bbox) {
+        if (current_node->children[i].bbox && bbox) {
           if (current_node->isLeaf) {
-            tupleids.push_back(current_node->child_tuple_or_node_id[i]);
+            tupleids.push_back(current_node->children[i].tuple_id);
           } else {
-            tocheck.push_back(current_node->child_tuple_or_node_id[i]);
+            tocheck.push_back(current_node->children[i].tuple_id);
           }
         }
       }
@@ -367,9 +365,9 @@ struct RTree {
     return tupleids;
   }
 
-  void insert(const BoundingBox &bbox, uint64_t tuple_id) {
+  void insert(const Entry &e) {
     if (root == nullptr) {
-      auto new_root = new RTreeNode(bbox, tuple_id, true, false, 0);
+      auto new_root = new RTreeNode(e, true, false, 0);
       new_root->myid = nodes.size();
       nodes.push_back(new_root);
       root = new_root;
@@ -377,18 +375,18 @@ struct RTree {
       return;
     }
 
-    chooseLeaf(bbox);
-    insertPhase2(bbox, tuple_id);
+    chooseLeaf(e.bbox);
+    insertPhase2(e);
   }
 
-  void insertPhase2(BoundingBox bbox, uint64_t tuple_id) {
-    if (!current_node->insert(bbox, tuple_id)) {
+  void insertPhase2(const Entry& e) {
+    if (!current_node->insert(e)) {
       auto new_node = current_node->split();
-      if (bbox.wastedArea(new_node->computeBoundingBox()) <
-          bbox.wastedArea(current_node->computeBoundingBox())) {
-        new_node->insert(bbox, tuple_id);
+      if (e.bbox.wastedArea(new_node->computeBoundingBox()) <
+          e.bbox.wastedArea(current_node->computeBoundingBox())) {
+        new_node->insert(e);
       } else {
-        current_node->insert(bbox, tuple_id);
+        current_node->insert(e);
       }
       auto cid = current_node->myid;
       auto cbb = current_node->computeBoundingBox();
@@ -396,7 +394,7 @@ struct RTree {
       if (!new_node->isLeaf) {
         auto nnid = new_node->myid;
         for (int i = 0; i < new_node->children_count; i++) {
-          loadNode(new_node->child_tuple_or_node_id[i]);
+          loadNode(new_node->children[i].tuple_id);
           current_node->parentid = nnid;
         }
         loadNode(cid);
@@ -406,16 +404,16 @@ struct RTree {
         auto pid = current_node->parentid;
         updateParentBoundingBox();
         loadNode(pid);
-        insertPhase2(new_node->computeBoundingBox(), new_node->myid);
+        insertPhase2(Entry(new_node->computeBoundingBox(), new_node->myid));
       } else {
-        auto new_root = new RTreeNode(cbb, cid, false, false, 0);
+        auto new_root = new RTreeNode(Entry(cbb, cid), false, false, 0);
         current_node->hasParent = true;
         current_node->parentid = nodes.size();
         new_node->parentid = nodes.size();
         new_root->myid = nodes.size();
         nodes.push_back(new_root);
 
-        new_root->insert(new_node->computeBoundingBox(), new_node->myid);
+        new_root->insert(Entry(new_node->computeBoundingBox(), new_node->myid));
         root = new_root;
       }
 
@@ -444,14 +442,14 @@ struct RTree {
     RTreeNode *current_node;
     for (auto e : *entries) {
       bool need_new_node = false;
-      if (e.bb.upperleft.x > next_x) {
+      if (e.bbox.upperleft.x > next_x) {
         need_new_node = true;
         next_x = next_x + x_slice;
       } else {
-        need_new_node = !current_node->insert(e.bb, e.tuple_id);
+        need_new_node = !current_node->insert(e);
       }
       if (need_new_node) {
-        current_node = new RTreeNode(e.bb, e.tuple_id, true, false, 0);
+        current_node = new RTreeNode(e, true, false, 0);
         current_node->myid = nodes.size();
         nodes.push_back(current_node);
       }
@@ -465,12 +463,12 @@ struct RTree {
         auto tuple_id = nodes[i]->myid;
 
         if (static_cast<int32_t>(i) > next_node) {
-          current_node = new RTreeNode(bb, tuple_id, false, false, 0);
+          current_node = new RTreeNode(Entry(bb, tuple_id), false, false, 0);
           current_node->myid = nodes.size();
           nodes.push_back(current_node);
           next_node = (i - 1) + RTREE_MAX_CHILDREN_COUNT;
         } else {
-          current_node->insert(bb, tuple_id);
+          current_node->insert(Entry(bb, tuple_id));
         }
         nodes[tuple_id]->parentid = current_node->myid;
         nodes[tuple_id]->hasParent = true;

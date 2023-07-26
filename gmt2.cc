@@ -10,6 +10,8 @@
 
 int main() {
 
+  std::cout << "sizeof(RTreeNode)=" << sizeof(RTreeNode) << std::endl;
+
   std::ifstream f("github.com/evansiroky/timezone-boundary-builder/releases/"
                   "download/2023b/combined-shapefile-with-oceans.gmt");
   std::string line;
