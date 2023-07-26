@@ -53,7 +53,9 @@ int main() {
   auto chicago = Point(Qs10d21(-87.65), Qs10d21(41.85));
   auto portland = Point(Qs10d21(-122.66), Qs10d21(45.51));
 
-  RTree rtree;
+  RTree srt_rtree;
+  RTree si_rtree;
+
   std::vector<Entry> entries;
   entries.reserve(polys.size());
 
@@ -61,7 +63,7 @@ int main() {
   for (size_t i = 0; i < polys.size(); i++) {
     auto p = Polygon{polys[i]};
     auto bb = p.boundingBox();
-    // rtree.insert(bb, i);
+    si_rtree.insert(Entry(bb, i));
     bb.center();
     entries.emplace_back(bb, i);
     maximal = maximal + bb;
@@ -90,13 +92,25 @@ int main() {
     }
   }
 
-  rtree.SRTLoad(&entries, maximal);
+  srt_rtree.SRTLoad(&entries, maximal);
 
   std::cout << std::endl;
-  std::cout << "Node Count: " << nodes.size() << std::endl;
+  std::cout << "SRT Node Count: " << srt_rtree.nodes.size() << std::endl;
+  std::cout << "SI Node Count: " << si_rtree.nodes.size() << std::endl;
   std::cout << std::endl;
 
-  for (auto r : rtree.find(pittsburgh)) {
+  std::cout << "SRT find" << std::endl;
+  for (auto r : srt_rtree.find(pittsburgh)) {
+    auto p = Polygon{polys[r]};
+    auto b = p.boundingBox();
+    std::cout << r << " " << names[poly_to_name[r]] << std::endl;
+    std::cout << "[" << (double)b.upperleft.x << " " << (double)b.upperleft.y
+              << ", " << (double)b.lowerright.x << " " << (double)b.lowerright.y
+              << "]" << std::endl;
+  }
+
+  std::cout << std::endl << "Serial Insertion find" << std::endl;
+  for (auto r : si_rtree.find(pittsburgh)) {
     auto p = Polygon{polys[r]};
     auto b = p.boundingBox();
     std::cout << r << " " << names[poly_to_name[r]] << std::endl;

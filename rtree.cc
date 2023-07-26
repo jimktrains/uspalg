@@ -168,8 +168,6 @@ constexpr static int RTREE_MIN_CHILDREN_COUNT = RTREE_MAX_CHILDREN_COUNT / 2;
 
 struct RTreeNode;
 
-std::vector<RTreeNode *> nodes;
-
 /*
  * Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
  *   Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
@@ -181,8 +179,7 @@ std::vector<RTreeNode *> nodes;
  *   NASA Contract No. NAS1-19480
  */
 struct RTreeNode {
-  RTreeNode(const Entry& e, bool il, bool hp,
-            uint64_t pid){
+  RTreeNode(const Entry &e, bool il, bool hp, uint64_t pid) {
     isLeaf = il;
     hasParent = hp;
     parentid = pid;
@@ -224,7 +221,7 @@ struct RTreeNode {
     return children[min_waste_i].tuple_id;
   }
 
-  RTreeNode *split() {
+  RTreeNode *split(std::vector<RTreeNode *> *nodes) {
     double max_wasted_space = 0;
     // uint8_t max_wasted_i = 0;
     uint8_t max_wasted_j = 0;
@@ -240,10 +237,11 @@ struct RTreeNode {
       }
     }
 
-    auto new_node = new RTreeNode(children[max_wasted_j], isLeaf, true, parentid);
+    auto new_node =
+        new RTreeNode(children[max_wasted_j], isLeaf, true, parentid);
     // Not thread-safe.
-    new_node->myid = nodes.size();
-    nodes.push_back(new_node);
+    new_node->myid = nodes->size();
+    nodes->push_back(new_node);
 
     // auto i_bb = children[max_wasted_i].bbox;
     auto j_bb = children[max_wasted_j].bbox;
@@ -282,7 +280,7 @@ struct RTreeNode {
     return new_node;
   }
 
-  bool insert(const Entry& e) {
+  bool insert(const Entry &e) {
     if (children_count > (RTREE_MAX_CHILDREN_COUNT - 1)) {
       return false;
     }
@@ -318,6 +316,7 @@ struct RTreeNode {
 struct RTree {
   RTreeNode *current_node = nullptr;
   RTreeNode *root = nullptr;
+  std::vector<RTreeNode *> nodes;
 
   void chooseLeaf(const BoundingBox &bbox) {
     uint64_t next = root->myid;
@@ -379,9 +378,9 @@ struct RTree {
     insertPhase2(e);
   }
 
-  void insertPhase2(const Entry& e) {
+  void insertPhase2(const Entry &e) {
     if (!current_node->insert(e)) {
-      auto new_node = current_node->split();
+      auto new_node = current_node->split(&nodes);
       if (e.bbox.wastedArea(new_node->computeBoundingBox()) <
           e.bbox.wastedArea(current_node->computeBoundingBox())) {
         new_node->insert(e);
