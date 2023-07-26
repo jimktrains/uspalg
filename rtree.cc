@@ -34,6 +34,10 @@ struct Range {
   Qs10d21 start;
   Qs10d21 end;
 
+  Qs10d21 length() {
+    return end - start;
+  }
+
   bool overlaps(const Range &other) {
     return start <= other.end && end >= other.start;
   }
@@ -50,6 +54,12 @@ struct BoundingBox {
 
   Point upperleft;
   Point lowerright;
+
+  Point center() const {
+    return Point(
+        upperleft.x + ((lowerright.x - upperleft.x)/Qs10d21(2)),
+        lowerright.y + ((upperleft.y - lowerright.y)/Qs10d21(2)));
+  }
 
   BoundingBox operator+(const BoundingBox &other) const {
     return BoundingBox{Point{std::min(upperleft.x, other.upperleft.x),
@@ -82,6 +92,22 @@ struct BoundingBox {
     return (*this + other).area() - this->area() - other.area();
   }
 };
+
+struct Entry {
+  Entry(BoundingBox &bb, uint64_t &tuple_id) : bb{bb}, tuple_id{tuple_id} {}
+
+  BoundingBox bb;
+  uint64_t tuple_id;
+
+  // Sorting like this for the STR algorithm.
+  bool operator<(const Entry &other) const {
+    if (bb.center().x < other.bb.center().x) {
+      return true;
+    }
+    return bb.center().y < other.bb.center().y;
+  }
+};
+
 
 struct Polygon {
   Point *points;
@@ -150,6 +176,11 @@ std::vector<RTreeNode *> nodes;
  * Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
  *   Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
  *   https://doi.org/10.1145/971697.602266.
+ *
+ * Leutenegger, Scott T., et al. STR:  A Simple and Efficient Algorithm for
+ *   R-Tree Packing. Institute for Computer Applications in Science and
+ *   Engineering NASA Langley Research Center, Feb. 1997.
+ *   NASA Contract No. NAS1-19480
  */
 struct RTreeNode {
   RTreeNode(const BoundingBox &bb, uint64_t i, bool isLeaf, bool hasParent,
@@ -394,5 +425,84 @@ struct RTree {
     } else {
       updateParentBoundingBox();
     }
+  }
+
+
+  // I'm not sure I've implemented this correctly. It does pack the tree
+  // better, but it also causes my `find` method to search through more
+  // nodes. For the timezone dataset and searching for Pittsburgh:
+  //
+  // serial insertion:
+  //   Node Count: 222
+  //   Nodes checked: 23
+  //
+  // SRTLoad:
+  //  Node Count: 179
+  //  Nodes checked: 30
+  //
+  // To be honest, I'm not certain why, but it could just be that this
+  // dataset is pathelogical? I have to load it and the different leafnode
+  // ids into QGIS. I would have expected much closer to the theoretical
+  // 3 nodes (ceil(log_{15}(1989)) = 3) than either of these?
+  void SRTLoad(std::vector<Entry>& entries, const BoundingBox& maximal) {
+    //std::sort(entries.begin(), entries.end());
+    for (size_t i = 0; i < entries.size(); i++) {
+      for (size_t j = i+1; j < entries.size(); j++) {
+        if (entries[j] < entries[i]) {
+          auto t = entries[i];
+          entries[i] = entries[j];
+          entries[j] = t;
+        }
+      }
+    }
+
+    nodes.reserve(ceil(1.25 * entries.size() / RTREE_MAX_CHILDREN_COUNT));
+
+    auto num_tiles = entries.size() / RTREE_MAX_CHILDREN_COUNT;
+    auto x_slice = Qs10d21(static_cast<double>(maximal.xrange().length()) /
+        ceil(sqrt(num_tiles)));
+    auto next_x = MIN_Qs10d21;
+
+    RTreeNode *current_node;
+    for (auto e : entries) {
+      bool need_new_node = false;
+      if (e.bb.upperleft.x > next_x) {
+        need_new_node = true;
+        next_x = next_x + x_slice;
+      } else {
+        need_new_node = !current_node->insert(e.bb, e.tuple_id);
+      }
+      if (need_new_node) {
+        current_node = new RTreeNode(e.bb, e.tuple_id, true, false, 0);
+        current_node->myid = nodes.size();
+        nodes.push_back(current_node);
+      }
+    }
+    uint16_t start = 0, end = nodes.size() + 1;
+    int32_t next_node = -1;
+
+    do {
+      std::cout << start << " " << end << " " << (end - start) << std::endl;
+      for (uint16_t i = start; i < end; i++) {
+        auto bb = nodes[i]->computeBoundingBox();
+        auto tuple_id = nodes[i]->myid;
+
+        if (static_cast<int32_t>(i) > next_node) {
+          current_node = new RTreeNode(bb, tuple_id, false, false, 0);
+          current_node->myid = nodes.size();
+          nodes.push_back(current_node);
+          next_node = (i-1) + RTREE_MAX_CHILDREN_COUNT;
+        } else {
+          current_node->insert(bb, tuple_id);
+        }
+        nodes[tuple_id]->parentid = current_node->myid;
+        nodes[tuple_id]->hasParent = true;
+      }
+      start = end;
+      end = nodes.size();
+      next_node = -1;
+    } while ((end - start) > 1);
+    std::cout << start << " " << end << " " << (end - start) << std::endl;
+    root = current_node;
   }
 };

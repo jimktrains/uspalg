@@ -1,4 +1,5 @@
 #include "rtree.cc"
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -72,10 +73,19 @@ int main() {
 
   std::ofstream ofbb("bbox", std::ios::binary);
   RTree rtree;
+  std::vector<Entry> entries;
+  entries.reserve(polys.size());
+
+  auto p = Polygon{&polys[0][0], polys[0].size()};
+  auto bb = p.boundingBox();
+  BoundingBox maximal = bb;
   for (size_t i = 0; i < polys.size(); i++) {
     auto p = Polygon{&polys[i][0], polys[i].size()};
     auto bb = p.boundingBox();
-    rtree.insert(bb, i);
+    //rtree.insert(bb, i);
+    bb.center();
+    entries.emplace_back(bb, i);
+    maximal = maximal + bb;
 
     ofbb.write(reinterpret_cast<char *>(&bb.upperleft.x),
                sizeof(bb.upperleft.x));
@@ -109,6 +119,9 @@ int main() {
                 << std::endl;
     }
   }
+
+  rtree.SRTLoad(entries, maximal);
+
   std::cout << std::endl;
   std::cout << "Node Count: " << nodes.size() << std::endl;
   std::cout << std::endl;
