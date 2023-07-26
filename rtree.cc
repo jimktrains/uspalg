@@ -463,7 +463,6 @@ struct RTree {
     int32_t next_node = -1;
 
     do {
-      std::cout << start << " " << end << " " << (end - start) << std::endl;
       for (uint16_t i = start; i < end; i++) {
         auto bb = nodes[i]->computeBoundingBox();
         auto tuple_id = nodes[i]->myid;
@@ -483,7 +482,6 @@ struct RTree {
       end = nodes.size();
       next_node = -1;
     } while ((end - start) > 1);
-    std::cout << start << " " << end << " " << (end - start) << std::endl;
     root = current_node;
   }
 };
