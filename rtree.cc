@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <vector>
 
@@ -46,8 +47,8 @@ struct Range {
 
 struct BoundingBox {
   BoundingBox()
-      : upperleft{Point{Qs10d21(0.), Qs10d21(0.)}},
-        lowerright{Point{Qs10d21(0.), Qs10d21(0.)}} {};
+      : upperleft{Point{Qs10d21(MAX_Qs10d21), Qs10d21(-MAX_Qs10d21)}},
+        lowerright{Point{Qs10d21(-MAX_Qs10d21), Qs10d21(MAX_Qs10d21)}} {};
 
   BoundingBox(Point ul, Point lr) : upperleft{ul}, lowerright{lr} {};
 
@@ -64,6 +65,13 @@ struct BoundingBox {
                              std::max(upperleft.y, other.upperleft.y)},
                        Point{std::max(lowerright.x, other.lowerright.x),
                              std::min(lowerright.y, other.lowerright.y)}};
+  }
+
+  BoundingBox operator+(const Point &other) const {
+    return BoundingBox{Point{std::min(upperleft.x, other.x),
+                             std::max(upperleft.y, other.y)},
+                       Point{std::max(lowerright.x, other.x),
+                             std::min(lowerright.y, other.y)}};
   }
 
   Range xrange() const { return Range{upperleft.x, lowerright.x}; }
@@ -110,21 +118,10 @@ struct Entry {
 };
 
 struct Polygon {
-  Point *points;
-  size_t npoints;
+  std::vector<Point> points;
 
   BoundingBox boundingBox() {
-    Qs10d21 mx = MAX_Qs10d21;
-    BoundingBox bb{Point{mx, -mx}, Point{-mx, mx}};
-
-    for (size_t i = 0; i < npoints; i++) {
-      bb.upperleft = Point{std::min(bb.upperleft.x, points[i].x),
-                           std::max(bb.upperleft.y, points[i].y)};
-      bb.lowerright = Point{std::max(bb.lowerright.x, points[i].x),
-                            std::min(bb.lowerright.y, points[i].y)};
-    }
-
-    return bb;
+    return std::accumulate(points.begin(), points.end(), BoundingBox());
   }
 
   /*
@@ -152,7 +149,7 @@ struct Polygon {
    */
   bool contains(const Point &p) const {
     bool c = false;
-    for (size_t i = 0, j = npoints - 1; i < npoints; j = i++) {
+    for (size_t i = 0, j = points.size()- 1; i < points.size(); j = i++) {
       if (((points[i].y > p.y) != (points[j].y > p.y)) &&
           (p.x < (points[j].x - points[i].x) * (p.y - points[i].y) /
                          (points[j].y - points[i].y) +
