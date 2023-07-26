@@ -17,6 +17,7 @@
  */
 #include <math.h>
 
+#include <algorithm>
 #include <limits>
 #include <numeric>
 #include <vector>
@@ -438,15 +439,62 @@ struct RTree {
   // To be honest, I'm not certain why, but it could just be that this
   // dataset is pathelogical? I have to load it and the different leafnode
   // ids into QGIS. I would have expected much closer to the theoretical
-  // 3 nodes (ceil(log_{15}(1989)) = 3) than either of these?
+  // 3 nodes (ceil(log_{15}(1989)) = 3) than either of these are?
   void SRTLoad(std::vector<Entry> *entries, const BoundingBox &maximal) {
-    // std::sort(entries.begin(), entries.end());
+    // I'm not sure why, but this segfaults
+    //
+    // Program received signal SIGSEGV, Segmentation fault.
+    //
+    // Compiled with
+    //
+    //    g++ -Wall -Werror -Werror=format-security -g -o gmt2.exe ./gmt2.cc
+    //
+    // gdb backtrace:
+    // clang-format off
+    //
+    //    0x0000555555557a4e in Qs10d21::operator- (this=0x5555591bd014) at ./qs10d21.cc:93
+    //    93	    return Qs10d21::rawInit(value ^ (((uint32_t)1) << 31));
+    //    (gdb) bt
+    //    #0  0x0000555555557a4e in Qs10d21::operator- (this=0x5555591bd014) at ./qs10d21.cc:93
+    //    #1  0x0000555555557afd in Qs10d21::operator- (this=0x5555591bd00c, other=...) at ./qs10d21.cc:102
+    //    #2  0x0000555555558011 in BoundingBox::center (this=0x5555591bd008) at ./rtree.cc:59
+    //    #3  0x000055555555840f in Entry::operator< (this=0x5555591bd008, other=...) at ./rtree.cc:102
+    //    #4  0x000055555555ef33 in __gnu_cxx::__ops::_Iter_less_iter::operator()<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, __gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > > > (this=0x7fffffffd6b7,
+    //        __it1=<error reading variable: Cannot access memory at address 0x5555591bd008>,
+    //      __it2={bb = {upperleft = {x = {value = 375185221}, y = {value = 135782882}}, lowerright = {x = {value = 377487360}, y = {value = 131860329}}}, tuple_id = 1374}) at /usr/include/c++/11/bits/predefined_ops.h:45
+    //    #5  0x000055555555f09e in std::__unguarded_partition<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, __gnu_cxx::__ops::_Iter_less_iter> (__first=<error reading variable: Cannot access memory at address 0x5555591bd008>,
+    //      __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142},
+    //      __pivot={bb = {upperleft = {x = {value = 375185221}, y = {value = 135782882}}, lowerright = {x = {value = 377487360}, y = {value = 131860329}}}, tuple_id = 1374}, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1884
+    //    #6  0x000055555555e00e in std::__unguarded_partition_pivot<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, __gnu_cxx::__ops::_Iter_less_iter> (
+    //      __first={bb = {upperleft = {x = {value = 375185221}, y = {value = 135782882}}, lowerright = {x = {value = 377487360}, y = {value = 131860329}}}, tuple_id = 1374},
+    //      __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1906
+    //    #7  0x000055555555cb22 in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (
+    //      __first={bb = {upperleft = {x = {value = 375185221}, y = {value = 135782882}}, lowerright = {x = {value = 377487360}, y = {value = 131860329}}}, tuple_id = 1374},
+    //      __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=12, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1938
+    //    #8  0x000055555555cb3d in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (
+    //      __first={bb = {upperleft = {x = {value = 325509957}, y = {value = 136183742}}, lowerright = {x = {value = 365992601}, y = {value = 106295485}}}, tuple_id = 638},
+    //    --Type <RET> for more, q to quit, c to continue without paging--c
+    //      __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=13, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1939
+    //    #9  0x000055555555cb3d in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (__first={bb = {upperleft = {x = {value = 272447660}, y = {value = 153329621}}, lowerright = {x = {value = 304543185}, y = {value = 135454143}}}, tuple_id = 809}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=14, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1939
+    //    #10 0x000055555555cb3d in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (__first={bb = {upperleft = {x = {value = 44842577}, y = {value = 125699794}}, lowerright = {x = {value = 59160695}, y = {value = 120605812}}}, tuple_id = 1088}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=15, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1939
+    //    #11 0x000055555555cb3d in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (__first={bb = {upperleft = {x = {value = 148379617}, y = {value = 118268786}}, lowerright = {x = {value = 148520082}, y = {value = 118199414}}}, tuple_id = 825}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=16, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1939
+    //    #12 0x000055555555cb3d in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (__first={bb = {upperleft = {x = {value = 2524971008}, y = {value = 141667287}}, lowerright = {x = {value = 2524970984}, y = {value = 140361613}}}, tuple_id = 1988}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=17, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1939
+    //    #13 0x000055555555cb3d in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (__first={bb = {upperleft = {x = {value = 36883568}, y = {value = 122888447}}, lowerright = {x = {value = 41368768}, y = {value = 118911072}}}, tuple_id = 1708}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=18, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1939
+    //    #14 0x000055555555cb3d in std::__introsort_loop<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, long, __gnu_cxx::__ops::_Iter_less_iter> (__first={bb = {upperleft = {x = {value = 10340406}, y = {value = 107871561}}, lowerright = {x = {value = 10342384}, y = {value = 107870381}}}, tuple_id = 994}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __depth_limit=19, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1939
+    //    #15 0x000055555555b1ec in std::__sort<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > >, __gnu_cxx::__ops::_Iter_less_iter> (__first={bb = {upperleft = {x = {value = 10340406}, y = {value = 107871561}}, lowerright = {x = {value = 10342384}, y = {value = 107870381}}}, tuple_id = 994}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}, __comp=...) at /usr/include/c++/11/bits/stl_algo.h:1954
+    //    #16 0x00005555555599ce in std::sort<__gnu_cxx::__normal_iterator<Entry*, std::vector<Entry, std::allocator<Entry> > > > (__first={bb = {upperleft = {x = {value = 10340406}, y = {value = 107871561}}, lowerright = {x = {value = 10342384}, y = {value = 107870381}}}, tuple_id = 994}, __last={bb = {upperleft = {x = {value = 1058929}, y = {value = 0}}, lowerright = {x = {value = 2485946161}, y = {value = 117815895}}}, tuple_id = 506013275271241142}) at /usr/include/c++/11/bits/stl_algo.h:4842
+    //    #17 0x0000555555558de2 in RTree::SRTLoad (this=0x7fffffffda90, entries=0x7fffffffdb50, maximal=...) at ./rtree.cc:446
+    //    #18 0x000055555555725f in main () at ./gmt2.cc:123
+    //
+    // clang-format on
+    //
+    // std::sort(entries->begin(), entries->end());
+
+    // This really basic bubble sort works though?
     for (size_t i = 0; i < entries->size(); i++) {
-      for (size_t j = i + 1; j < entries->size(); j++) {
-        if (entries[j] < entries[i]) {
-          auto t = entries[i];
-          entries[i] = entries[j];
-          entries[j] = t;
+      for (size_t j = 0; j < entries->size() - i - 1; j++) {
+        if (entries->at(j + 1) < entries->at(j)) {
+          std::swap(entries->at(j + 1), entries->at(j));
         }
       }
     }
