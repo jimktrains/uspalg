@@ -82,7 +82,7 @@ int main() {
   for (size_t i = 0; i < polys.size(); i++) {
     auto p = Polygon{&polys[i][0], polys[i].size()};
     auto bb = p.boundingBox();
-    //rtree.insert(bb, i);
+    // rtree.insert(bb, i);
     bb.center();
     entries.emplace_back(bb, i);
     maximal = maximal + bb;
@@ -120,7 +120,7 @@ int main() {
     }
   }
 
-  rtree.SRTLoad(entries, maximal);
+  rtree.SRTLoad(&entries, maximal);
 
   std::cout << std::endl;
   std::cout << "Node Count: " << nodes.size() << std::endl;

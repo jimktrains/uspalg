@@ -34,9 +34,7 @@ struct Range {
   Qs10d21 start;
   Qs10d21 end;
 
-  Qs10d21 length() {
-    return end - start;
-  }
+  Qs10d21 length() { return end - start; }
 
   bool overlaps(const Range &other) {
     return start <= other.end && end >= other.start;
@@ -56,9 +54,8 @@ struct BoundingBox {
   Point lowerright;
 
   Point center() const {
-    return Point(
-        upperleft.x + ((lowerright.x - upperleft.x)/Qs10d21(2)),
-        lowerright.y + ((upperleft.y - lowerright.y)/Qs10d21(2)));
+    return Point(upperleft.x + ((lowerright.x - upperleft.x) / Qs10d21(2)),
+                 lowerright.y + ((upperleft.y - lowerright.y) / Qs10d21(2)));
   }
 
   BoundingBox operator+(const BoundingBox &other) const {
@@ -107,7 +104,6 @@ struct Entry {
     return bb.center().y < other.bb.center().y;
   }
 };
-
 
 struct Polygon {
   Point *points;
@@ -427,7 +423,6 @@ struct RTree {
     }
   }
 
-
   // I'm not sure I've implemented this correctly. It does pack the tree
   // better, but it also causes my `find` method to search through more
   // nodes. For the timezone dataset and searching for Pittsburgh:
@@ -444,10 +439,10 @@ struct RTree {
   // dataset is pathelogical? I have to load it and the different leafnode
   // ids into QGIS. I would have expected much closer to the theoretical
   // 3 nodes (ceil(log_{15}(1989)) = 3) than either of these?
-  void SRTLoad(std::vector<Entry>& entries, const BoundingBox& maximal) {
-    //std::sort(entries.begin(), entries.end());
-    for (size_t i = 0; i < entries.size(); i++) {
-      for (size_t j = i+1; j < entries.size(); j++) {
+  void SRTLoad(std::vector<Entry> *entries, const BoundingBox &maximal) {
+    // std::sort(entries.begin(), entries.end());
+    for (size_t i = 0; i < entries->size(); i++) {
+      for (size_t j = i + 1; j < entries->size(); j++) {
         if (entries[j] < entries[i]) {
           auto t = entries[i];
           entries[i] = entries[j];
@@ -456,15 +451,15 @@ struct RTree {
       }
     }
 
-    nodes.reserve(ceil(1.25 * entries.size() / RTREE_MAX_CHILDREN_COUNT));
+    nodes.reserve(ceil(1.25 * entries->size() / RTREE_MAX_CHILDREN_COUNT));
 
-    auto num_tiles = entries.size() / RTREE_MAX_CHILDREN_COUNT;
+    auto num_tiles = entries->size() / RTREE_MAX_CHILDREN_COUNT;
     auto x_slice = Qs10d21(static_cast<double>(maximal.xrange().length()) /
-        ceil(sqrt(num_tiles)));
+                           ceil(sqrt(num_tiles)));
     auto next_x = MIN_Qs10d21;
 
     RTreeNode *current_node;
-    for (auto e : entries) {
+    for (auto e : *entries) {
       bool need_new_node = false;
       if (e.bb.upperleft.x > next_x) {
         need_new_node = true;
@@ -491,7 +486,7 @@ struct RTree {
           current_node = new RTreeNode(bb, tuple_id, false, false, 0);
           current_node->myid = nodes.size();
           nodes.push_back(current_node);
-          next_node = (i-1) + RTREE_MAX_CHILDREN_COUNT;
+          next_node = (i - 1) + RTREE_MAX_CHILDREN_COUNT;
         } else {
           current_node->insert(bb, tuple_id);
         }
