@@ -189,11 +189,6 @@ struct RTreeNode {
   bool isLeaf;
   bool hasParent;
   uint64_t parentid;
-  /*
-   * If we store the boudning box inside the node, then we can load
-   * this block from the sd card and figure out which block to descend
-   * into without loading anything else.
-   */
   Entry children[RTREE_MAX_CHILDREN_COUNT];
 
   uint64_t chooseLeaf(const BoundingBox &bbox) {
@@ -218,7 +213,7 @@ struct RTreeNode {
     return children[min_waste_i].tuple_id;
   }
 
-  RTreeNode *split(std::vector<RTreeNode *> *nodes) {
+  int64_t split(std::vector<std::unique_ptr<RTreeNode>> *nodes) {
     double max_wasted_space = 0;
     // uint8_t max_wasted_i = 0;
     uint8_t max_wasted_j = 0;
@@ -234,11 +229,12 @@ struct RTreeNode {
       }
     }
 
-    auto new_node =
-        new RTreeNode(children[max_wasted_j], isLeaf, true, parentid);
+    auto new_nodeb = std::unique_ptr<RTreeNode>(
+        new RTreeNode(children[max_wasted_j], isLeaf, true, parentid));
     // Not thread-safe.
-    new_node->myid = nodes->size();
-    nodes->push_back(new_node);
+    new_nodeb->myid = nodes->size();
+    auto new_node = new_nodeb->myid;
+    nodes->push_back(std::move(new_nodeb));
 
     // auto i_bb = children[max_wasted_i].bbox;
     auto j_bb = children[max_wasted_j].bbox;
@@ -253,7 +249,7 @@ struct RTreeNode {
       if (children_count < RTREE_MIN_CHILDREN_COUNT) {
         break;
       }
-      if (new_node->children_count > RTREE_MIN_CHILDREN_COUNT) {
+      if (nodes->at(new_node)->children_count > RTREE_MIN_CHILDREN_COUNT) {
         break;
       }
       double min_wasted_j = std::numeric_limits<double>::max();
@@ -266,7 +262,7 @@ struct RTreeNode {
         }
       }
 
-      new_node->insert(children[min_m]);
+      nodes->at(new_node)->insert(children[min_m]);
       for (uint8_t l = min_m + 1; l < children_count; l++) {
         children[l - 1].bbox = children[l].bbox;
         children[l - 1].tuple_id = children[l].tuple_id;
@@ -311,27 +307,27 @@ struct RTreeNode {
 // will work on a microcontroller where I may only have access
 // to one node at a time when searching.
 struct RTree {
-  RTreeNode *current_node = nullptr;
-  RTreeNode *root = nullptr;
-  std::vector<RTreeNode *> nodes;
+  int32_t current_node = -1;
+  int32_t root = -1;
+  std::vector<std::unique_ptr<RTreeNode>> nodes;
 
   void chooseLeaf(const BoundingBox &bbox) {
-    uint64_t next = root->myid;
+    uint64_t next = nodes[root]->myid;
 
     do {
       loadNode(next);
-      next = current_node->chooseLeaf(bbox);
-    } while (next != current_node->myid);
+      next = nodes[current_node]->chooseLeaf(bbox);
+    } while (next != nodes[current_node]->myid);
   }
 
-  void loadNode(uint64_t i) { current_node = nodes[i]; }
+  void loadNode(uint64_t i) { current_node = i; }
 
   void updateParentBoundingBox() {
-    if (current_node->hasParent) {
-      auto cid = current_node->myid;
-      auto cbb = current_node->computeBoundingBox();
-      loadNode(current_node->parentid);
-      current_node->updateChildBoundingBox(cid, cbb);
+    if (nodes[current_node]->hasParent) {
+      auto cid = nodes[current_node]->myid;
+      auto cbb = nodes[current_node]->computeBoundingBox();
+      loadNode(nodes[current_node]->parentid);
+      nodes[current_node]->updateChildBoundingBox(cid, cbb);
       updateParentBoundingBox();
     }
   }
@@ -342,17 +338,17 @@ struct RTree {
     std::vector<uint64_t> tocheck;
     std::vector<uint64_t> tupleids;
     int nodes_checked = 0;
-    tocheck.push_back(root->myid);
+    tocheck.push_back(nodes[root]->myid);
     while (!tocheck.empty()) {
       loadNode(tocheck.back());
       nodes_checked++;
       tocheck.pop_back();
-      for (int i = 0; i < current_node->children_count; i++) {
-        if (current_node->children[i].bbox && bbox) {
-          if (current_node->isLeaf) {
-            tupleids.push_back(current_node->children[i].tuple_id);
+      for (int i = 0; i < nodes[current_node]->children_count; i++) {
+        if (nodes[current_node]->children[i].bbox && bbox) {
+          if (nodes[current_node]->isLeaf) {
+            tupleids.push_back(nodes[current_node]->children[i].tuple_id);
           } else {
-            tocheck.push_back(current_node->children[i].tuple_id);
+            tocheck.push_back(nodes[current_node]->children[i].tuple_id);
           }
         }
       }
@@ -362,12 +358,13 @@ struct RTree {
   }
 
   void insert(const Entry &e) {
-    if (root == nullptr) {
-      auto new_root = new RTreeNode(e, true, false, 0);
+    if (root == -1) {
+      auto new_root =
+          std::unique_ptr<RTreeNode>(new RTreeNode(e, true, false, 0));
       new_root->myid = nodes.size();
-      nodes.push_back(new_root);
-      root = new_root;
-      current_node = new_root;
+      root = new_root->myid;
+      current_node = root;
+      nodes.push_back(std::move(new_root));
       return;
     }
 
@@ -376,43 +373,44 @@ struct RTree {
   }
 
   void insertPhase2(const Entry &e) {
-    if (!current_node->insert(e)) {
-      auto new_node = current_node->split(&nodes);
-      if (e.bbox.wastedArea(new_node->computeBoundingBox()) <
-          e.bbox.wastedArea(current_node->computeBoundingBox())) {
-        new_node->insert(e);
+    if (!nodes[current_node]->insert(e)) {
+      auto new_node = nodes[current_node]->split(&nodes);
+      if (e.bbox.wastedArea(nodes[new_node]->computeBoundingBox()) <
+          e.bbox.wastedArea(nodes[current_node]->computeBoundingBox())) {
+        nodes[new_node]->insert(e);
       } else {
-        current_node->insert(e);
+        nodes[current_node]->insert(e);
       }
-      auto cid = current_node->myid;
-      auto cbb = current_node->computeBoundingBox();
+      auto cid = nodes[current_node]->myid;
+      auto cbb = nodes[current_node]->computeBoundingBox();
 
-      if (!new_node->isLeaf) {
-        auto nnid = new_node->myid;
-        for (int i = 0; i < new_node->children_count; i++) {
-          loadNode(new_node->children[i].tuple_id);
-          current_node->parentid = nnid;
+      if (!nodes[new_node]->isLeaf) {
+        auto nnid = nodes[new_node]->myid;
+        for (int i = 0; i < nodes[new_node]->children_count; i++) {
+          loadNode(nodes[new_node]->children[i].tuple_id);
+          nodes[current_node]->parentid = nnid;
         }
         loadNode(cid);
       }
 
-      if (current_node->hasParent) {
-        auto pid = current_node->parentid;
+      if (nodes[current_node]->hasParent) {
+        auto pid = nodes[current_node]->parentid;
         updateParentBoundingBox();
         loadNode(pid);
-        insertPhase2(Entry(new_node->computeBoundingBox(), new_node->myid));
+        insertPhase2(Entry(nodes[new_node]->computeBoundingBox(),
+                           nodes[new_node]->myid));
       } else {
-        auto new_root = new RTreeNode(Entry(cbb, cid), false, false, 0);
-        current_node->hasParent = true;
-        current_node->parentid = nodes.size();
-        new_node->parentid = nodes.size();
+        auto new_root = std::unique_ptr<RTreeNode>(
+            new RTreeNode(Entry(cbb, cid), false, false, 0));
+        nodes[current_node]->hasParent = true;
+        nodes[current_node]->parentid = nodes.size();
+        nodes[new_node]->parentid = nodes.size();
         new_root->myid = nodes.size();
-        nodes.push_back(new_root);
-
-        new_root->insert(Entry(new_node->computeBoundingBox(), new_node->myid));
-        root = new_root;
+        new_root->insert(Entry(nodes[new_node]->computeBoundingBox(),
+                               nodes[new_node]->myid));
+        root = new_root->myid;
+        nodes.push_back(std::move(new_root));
       }
-
     } else {
       updateParentBoundingBox();
     }
@@ -435,19 +433,20 @@ struct RTree {
                            ceil(sqrt(num_tiles)));
     auto next_x = MIN_Qs10d21;
 
-    RTreeNode *current_node;
     for (auto e : *entries) {
       bool need_new_node = false;
       if (e.bbox.upperleft.x > next_x) {
         need_new_node = true;
         next_x = next_x + x_slice;
       } else {
-        need_new_node = !current_node->insert(e);
+        need_new_node = !nodes[current_node]->insert(e);
       }
       if (need_new_node) {
-        current_node = new RTreeNode(e, true, false, 0);
-        current_node->myid = nodes.size();
-        nodes.push_back(current_node);
+        auto current_nodeb =
+            std::unique_ptr<RTreeNode>(new RTreeNode(e, true, false, 0));
+        current_nodeb->myid = nodes.size();
+        current_node = current_nodeb->myid;
+        nodes.push_back(std::move(current_nodeb));
       }
     }
     uint16_t start = 0, end = nodes.size() + 1;
@@ -459,14 +458,16 @@ struct RTree {
         auto tuple_id = nodes[i]->myid;
 
         if (static_cast<int32_t>(i) > next_node) {
-          current_node = new RTreeNode(Entry(bb, tuple_id), false, false, 0);
-          current_node->myid = nodes.size();
-          nodes.push_back(current_node);
+          auto current_nodeb = std::unique_ptr<RTreeNode>(
+              new RTreeNode(Entry(bb, tuple_id), false, false, 0));
+          current_nodeb->myid = nodes.size();
+          current_node = current_nodeb->myid;
+          nodes.push_back(std::move(current_nodeb));
           next_node = (i - 1) + RTREE_MAX_CHILDREN_COUNT;
         } else {
-          current_node->insert(Entry(bb, tuple_id));
+          nodes[current_node]->insert(Entry(bb, tuple_id));
         }
-        nodes[tuple_id]->parentid = current_node->myid;
+        nodes[tuple_id]->parentid = nodes[current_node]->myid;
         nodes[tuple_id]->hasParent = true;
       }
       start = end;
