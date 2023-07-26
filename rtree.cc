@@ -108,13 +108,10 @@ struct Entry {
 
   // Sorting like this for the STR algorithm.
   bool operator<(const Entry &other) const {
-    if (bbox.center().x < other.bbox.center().x) {
-      return true;
+    if (bbox.center().x == other.bbox.center().x) {
+      return bbox.center().y < other.bbox.center().y;
     }
-    if (bbox.center().x > other.bbox.center().x) {
-      return false;
-    }
-    return bbox.center().y < other.bbox.center().y;
+    return bbox.center().x < other.bbox.center().x;
   }
 };
 
