@@ -68,10 +68,10 @@ struct BoundingBox {
   }
 
   BoundingBox operator+(const Point &other) const {
-    return BoundingBox{Point{std::min(upperleft.x, other.x),
-                             std::max(upperleft.y, other.y)},
-                       Point{std::max(lowerright.x, other.x),
-                             std::min(lowerright.y, other.y)}};
+    return BoundingBox{
+        Point{std::min(upperleft.x, other.x), std::max(upperleft.y, other.y)},
+        Point{std::max(lowerright.x, other.x),
+              std::min(lowerright.y, other.y)}};
   }
 
   Range xrange() const { return Range{upperleft.x, lowerright.x}; }
@@ -149,7 +149,7 @@ struct Polygon {
    */
   bool contains(const Point &p) const {
     bool c = false;
-    for (size_t i = 0, j = points.size()- 1; i < points.size(); j = i++) {
+    for (size_t i = 0, j = points.size() - 1; i < points.size(); j = i++) {
       if (((points[i].y > p.y) != (points[j].y > p.y)) &&
           (p.x < (points[j].x - points[i].x) * (p.y - points[i].y) /
                          (points[j].y - points[i].y) +

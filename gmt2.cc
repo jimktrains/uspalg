@@ -43,26 +43,6 @@ int main() {
     }
   }
 
-  std::ofstream of("polys", std::ios::binary);
-  std::ofstream ofidx("polysidx", std::ios::binary);
-  uint32_t n = polys.size();
-  unsigned int offset = 0;
-
-  of.write(reinterpret_cast<char *>(&n), sizeof(n));
-  offset += sizeof(n);
-  for (auto i : polys) {
-    ofidx.write(reinterpret_cast<char *>(&offset), sizeof(offset));
-    n = i.size();
-    of.write(reinterpret_cast<char *>(&n), sizeof(n));
-    offset += sizeof(n);
-    for (auto j : i) {
-      of.write(reinterpret_cast<char *>(&j.x), sizeof(j.x));
-      offset += sizeof(j.x);
-      of.write(reinterpret_cast<char *>(&j.y), sizeof(j.y));
-      offset += sizeof(j.y);
-    }
-  }
-
   std::cout << "Lines:    " << lines << std::endl
             << "Objects:  " << names.size() << std::endl
             << "Polygons: " << polys.size() << std::endl;
@@ -71,30 +51,18 @@ int main() {
   auto chicago = Point(Qs10d21(-87.65), Qs10d21(41.85));
   auto portland = Point(Qs10d21(-122.66), Qs10d21(45.51));
 
-  std::ofstream ofbb("bbox", std::ios::binary);
   RTree rtree;
   std::vector<Entry> entries;
   entries.reserve(polys.size());
 
-  auto p = Polygon{&polys[0][0], polys[0].size()};
-  auto bb = p.boundingBox();
-  BoundingBox maximal = bb;
+  BoundingBox maximal;
   for (size_t i = 0; i < polys.size(); i++) {
-    auto p = Polygon{&polys[i][0], polys[i].size()};
+    auto p = Polygon{polys[i]};
     auto bb = p.boundingBox();
     // rtree.insert(bb, i);
     bb.center();
     entries.emplace_back(bb, i);
     maximal = maximal + bb;
-
-    ofbb.write(reinterpret_cast<char *>(&bb.upperleft.x),
-               sizeof(bb.upperleft.x));
-    ofbb.write(reinterpret_cast<char *>(&bb.upperleft.y),
-               sizeof(bb.upperleft.y));
-    ofbb.write(reinterpret_cast<char *>(&bb.lowerright.x),
-               sizeof(bb.lowerright.x));
-    ofbb.write(reinterpret_cast<char *>(&bb.lowerright.y),
-               sizeof(bb.lowerright.y));
 
     if (p && pittsburgh) {
       std::cout << "Found pittsburgh in " << i << " " << names[poly_to_name[i]]
@@ -127,7 +95,7 @@ int main() {
   std::cout << std::endl;
 
   for (auto r : rtree.find(pittsburgh)) {
-    auto p = Polygon{&polys[r][0], polys[r].size()};
+    auto p = Polygon{polys[r]};
     auto b = p.boundingBox();
     std::cout << r << " " << names[poly_to_name[r]] << std::endl;
     std::cout << "[" << (double)b.upperleft.x << " " << (double)b.upperleft.y
