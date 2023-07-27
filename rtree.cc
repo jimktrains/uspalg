@@ -46,6 +46,8 @@ struct Range {
 };
 
 struct BoundingBox {
+  // This bounding box is flipped such that nothing would be contained
+  // in it.
   BoundingBox()
       : upperleft{Point{Qs10d21(MAX_Qs10d21), Qs10d21(-MAX_Qs10d21)}},
         lowerright{Point{Qs10d21(-MAX_Qs10d21), Qs10d21(MAX_Qs10d21)}} {};
@@ -163,8 +165,6 @@ struct Polygon {
 constexpr static int RTREE_MAX_CHILDREN_COUNT = 15;
 constexpr static int RTREE_MIN_CHILDREN_COUNT = RTREE_MAX_CHILDREN_COUNT / 2;
 
-struct RTreeNode;
-
 /*
  * Guttman, Antomn. "R-Trees - A Dynamic Index Structure for Spatial
  *   Searching." ACM SIGMOD Record, vol. 14, no. 2, June 1984, pp. 47–57.,
@@ -239,10 +239,8 @@ struct RTreeNode {
     // auto i_bb = children[max_wasted_i].bbox;
     auto j_bb = children[max_wasted_j].bbox;
 
-    for (int k = max_wasted_j + 1; k < children_count; k++) {
-      children[k - 1].bbox = children[k].bbox;
-      children[k - 1].tuple_id = children[k].tuple_id;
-    }
+    std::copy(std::begin(children) + max_wasted_j + 1, std::end(children),
+              std::begin(children) + max_wasted_j);
     children_count--;
 
     for (int k = 0; k < children_count; k++) {
@@ -263,10 +261,8 @@ struct RTreeNode {
       }
 
       nodes->at(new_node)->insert(children[min_m]);
-      for (uint8_t l = min_m + 1; l < children_count; l++) {
-        children[l - 1].bbox = children[l].bbox;
-        children[l - 1].tuple_id = children[l].tuple_id;
-      }
+      std::copy(std::begin(children) + min_m + 1, std::end(children),
+                std::begin(children) + min_m);
       children_count--;
     }
 
@@ -277,28 +273,23 @@ struct RTreeNode {
     if (children_count > (RTREE_MAX_CHILDREN_COUNT - 1)) {
       return false;
     }
-    children[children_count] = e;
 
+    children[children_count] = e;
     children_count++;
 
     return true;
   }
 
   void updateChildBoundingBox(uint64_t cid, BoundingBox bb) {
-    for (uint8_t i = 0; i < children_count; i++) {
-      if (children[i].tuple_id == cid) {
-        children[i].bbox = bb;
-        break;
-      }
-    }
+    auto it = std::find_if(std::begin(children), std::end(children),
+                           [cid](auto e) { return e.tuple_id == cid; });
+    it->bbox = bb;
   }
 
   BoundingBox computeBoundingBox() {
-    BoundingBox bb = children[0].bbox;
-    for (int16_t i = 1; i < children_count; i++) {
-      bb = bb + children[i].bbox;
-    }
-    return bb;
+    return std::accumulate(std::begin(children), std::end(children),
+                           BoundingBox(),
+                           [](auto a, auto b) { return a + b.bbox; });
   }
 };
 
@@ -353,7 +344,6 @@ struct RTree {
         }
       }
     }
-    std::cout << "Nodes checked: " << nodes_checked << std::endl;
     return tupleids;
   }
 
