@@ -15,9 +15,9 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-#include <bitset>
+//#include <bitset>
 #include <cstdint>
-#include <iostream>
+//#include <iostream>
 
 // I'd template this, but I'm not sure how I'd go about getting the double
 // sized type for multiplication.
